@@ -12,8 +12,25 @@ def _reload_config():
     importlib.invalidate_caches()
 
 
+def _save_core_modules():
+    saved = {}
+    for mod_name in list(sys.modules):
+        if mod_name.startswith("app.core"):
+            saved[mod_name] = sys.modules[mod_name]
+    return saved
+
+
+def _restore_core_modules(saved: dict):
+    for mod_name in list(sys.modules):
+        if mod_name.startswith("app.core"):
+            del sys.modules[mod_name]
+    sys.modules.update(saved)
+    importlib.invalidate_caches()
+
+
 @pytest.fixture(autouse=True)
 def clear_env():
+    saved = _save_core_modules()
     keys = [k for k in os.environ if k.startswith(("ENVIRONMENT", "DEBUG", "APP_NAME", "API_PREFIX",
                                                     "HOST", "PORT", "DATABASE_URL", "DATABASE_POOL_SIZE",
                                                     "DATABASE_MAX_OVERFLOW", "REDIS_URL", "JWT_SECRET",
@@ -22,7 +39,7 @@ def clear_env():
     for k in keys:
         del os.environ[k]
     yield
-    _reload_config()
+    _restore_core_modules(saved)
 
 
 def test_config_loads_with_env_vars():

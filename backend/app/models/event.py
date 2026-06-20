@@ -39,7 +39,9 @@ class Event(TimestampMixin, Base):
     end_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_registrations: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    coordinator_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    coordinator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, default=None)
+    brochure_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    brochure_file_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     creator: Mapped["User"] = relationship(back_populates="events_created", foreign_keys=[created_by])
     coordinator: Mapped["User"] = relationship(back_populates="events_coordinated", foreign_keys=[coordinator_id])
