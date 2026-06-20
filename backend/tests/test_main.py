@@ -28,5 +28,5 @@ async def test_app_has_cors_middleware(app):
 async def test_app_has_docs_enabled_in_debug(app):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/docs")
+        response = await client.get("/api/v1/docs")
     assert response.status_code == 200

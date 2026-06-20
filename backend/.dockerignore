@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+.git
+.gitignore
+tests/
+.env
+.env.example
+.venv
+*.md
+.idea/
+.vscode/
+coverage/
