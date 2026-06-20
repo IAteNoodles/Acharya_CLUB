@@ -56,11 +56,22 @@ def test_config_defaults():
 
 
 def test_config_raises_on_missing_required():
-    for k in ["DATABASE_URL", "JWT_SECRET"]:
-        if k in os.environ:
-            del os.environ[k]
+    # Temporarily remove .env so pydantic-settings can't read from it
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    renamed = False
+    if os.path.exists(env_path):
+        os.rename(env_path, env_path + ".bak")
+        renamed = True
 
-    _reload_config()
-    with pytest.raises(Exception):
-        from app.core.config import Settings
-        Settings()
+    try:
+        for k in ["DATABASE_URL", "JWT_SECRET"]:
+            if k in os.environ:
+                del os.environ[k]
+
+        _reload_config()
+        with pytest.raises(Exception):
+            from app.core.config import Settings
+            Settings()
+    finally:
+        if renamed:
+            os.rename(env_path + ".bak", env_path)
