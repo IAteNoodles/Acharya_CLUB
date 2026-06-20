@@ -1,16 +1,32 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import get_settings
-from app.core.exceptions import register_exception_handlers
+
 from app.api.v1.health import router as health_router
+from app.core.config import get_settings
+from app.core.database import engine
+from app.core.exceptions import register_exception_handlers
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        async with engine.connect() as conn:
+            await conn.run_sync(lambda sync_conn: None)
+    except Exception:
+        pass
+    yield
+    await engine.dispose()
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         version="1.0.0",
+        lifespan=lifespan,
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
     )
