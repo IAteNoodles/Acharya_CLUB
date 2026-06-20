@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 class AppHTTPException(Exception):
@@ -85,6 +86,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=exc.status_code,
             content=body,
             headers=exc.headers,
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "success": False,
+                "error": {
+                    "code": "NOT_FOUND" if exc.status_code == 404 else "HTTP_ERROR",
+                    "message": exc.detail,
+                },
+            },
         )
 
     @app.exception_handler(Exception)
