@@ -24,7 +24,7 @@ class Attendance(TimestampMixin, Base):
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     event: Mapped["Event"] = relationship(back_populates="attendance_records")
-    student: Mapped["User"] = relationship()
+    student: Mapped["User"] = relationship(foreign_keys=[student_id])
     marker: Mapped["User"] = relationship(back_populates="attendance_marks", foreign_keys=[marked_by])
 
     __table_args__ = (
