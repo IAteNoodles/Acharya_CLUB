@@ -43,7 +43,7 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/refresh")
 async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    result = await auth_service.refresh(db=db, refresh_token=data.refreshToken)
+    result = await auth_service.refresh(refresh_token=data.refreshToken)
     return {
         "success": True,
         "data": {

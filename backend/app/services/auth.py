@@ -95,7 +95,15 @@ async def login(db: AsyncSession, email: str, password: str) -> dict:
 
 
 async def refresh(refresh_token: str) -> dict:
-    payload = verify_token(refresh_token)
+    from fastapi import HTTPException, status
+
+    try:
+        payload = verify_token(refresh_token)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
 
     if payload.get("type") != "refresh":
         from fastapi import HTTPException, status
