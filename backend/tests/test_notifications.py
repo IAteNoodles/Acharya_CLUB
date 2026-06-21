@@ -472,3 +472,50 @@ class TestEventNotificationIntegration:
             )
 
         mock_create.assert_awaited_once()
+
+
+class TestTeacherNotificationIntegration:
+
+    @pytest.mark.asyncio
+    async def test_approve_teacher_creates_notification(self):
+        from app.services.user import approve_teacher
+        from app.services.notification import NotificationService
+
+        db = AsyncMock()
+        mock_user = MagicMock()
+        mock_user.id = str(USER_ID)
+        mock_user.role = "teacher"
+        mock_user.status = "pending"
+        mock_user.name = "John"
+        mock_user.email = "john@college.edu"
+        mock_user.created_at = MagicMock()
+        mock_user.updated_at = MagicMock()
+
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_user))
+
+        with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
+            await approve_teacher(db, str(USER_ID))
+
+        mock_create.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_reject_teacher_creates_notification(self):
+        from app.services.user import reject_teacher
+        from app.services.notification import NotificationService
+
+        db = AsyncMock()
+        mock_user = MagicMock()
+        mock_user.id = str(USER_ID)
+        mock_user.role = "teacher"
+        mock_user.status = "pending"
+        mock_user.name = "John"
+        mock_user.email = "john@college.edu"
+        mock_user.created_at = MagicMock()
+        mock_user.updated_at = MagicMock()
+
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_user))
+
+        with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
+            await reject_teacher(db, str(USER_ID))
+
+        mock_create.assert_awaited_once()

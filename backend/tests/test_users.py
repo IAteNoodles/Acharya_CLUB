@@ -181,7 +181,7 @@ class TestUserService:
         result = await approve_teacher(mock_session, "550e8400-e29b-41d4-a716-446655440011")
 
         assert result.status == "active"
-        mock_session.commit.assert_awaited_once()
+        assert mock_session.commit.await_count == 2
 
     @pytest.mark.asyncio
     async def test_approve_teacher_not_found(self):
@@ -279,7 +279,7 @@ class TestUserService:
         result = await reject_teacher(mock_session, "550e8400-e29b-41d4-a716-446655440015")
 
         assert result.status == "rejected"
-        mock_session.commit.assert_awaited_once()
+        assert mock_session.commit.await_count == 2
 
     @pytest.mark.asyncio
     async def test_reject_teacher_not_found(self):

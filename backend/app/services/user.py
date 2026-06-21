@@ -2,6 +2,7 @@ import uuid
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.users import UserOut, PendingTeachersResponse, TeacherListResponse
+from app.services.notification import NotificationService, NotificationType, _render_notification
 
 
 def _compute_pagination(page: int, limit: int, total: int):
@@ -75,6 +76,16 @@ async def approve_teacher(db: AsyncSession, user_id: str) -> UserOut:
         raise HTTPException(status_code=409, detail="User is already rejected")
 
     user.status = "active"
+    title, message = _render_notification(NotificationType.TEACHER_APPROVED)
+    await NotificationService.create_notification(
+        db,
+        user_id=user.id,
+        notif_type=NotificationType.TEACHER_APPROVED,
+        title=title,
+        message=message,
+        entity_type="user",
+        entity_id=user.id,
+    )
     await db.commit()
     await db.refresh(user)
 
@@ -93,6 +104,16 @@ async def reject_teacher(db: AsyncSession, user_id: str) -> UserOut:
         raise HTTPException(status_code=409, detail="User is already rejected")
 
     user.status = "rejected"
+    title, message = _render_notification(NotificationType.TEACHER_REJECTED)
+    await NotificationService.create_notification(
+        db,
+        user_id=user.id,
+        notif_type=NotificationType.TEACHER_REJECTED,
+        title=title,
+        message=message,
+        entity_type="user",
+        entity_id=user.id,
+    )
     await db.commit()
     await db.refresh(user)
 
