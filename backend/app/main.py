@@ -10,6 +10,7 @@ from app.api.v1.attendance import router as attendance_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.events import router as events_router
 from app.api.v1.health import router as health_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.registrations import router as registrations_router
 from app.api.v1.users import router as users_router
 from app.core.config import get_settings
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
             {"name": "Events", "description": "Event management"},
             {"name": "Registrations", "description": "Event registrations"},
             {"name": "Attendance", "description": "Attendance tracking"},
+            {"name": "notifications", "description": "In-app notifications"},
         ],
     )
 
@@ -117,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(events_router)
     app.include_router(registrations_router)
     app.include_router(attendance_router)
+    app.include_router(notifications_router)
     app.include_router(users_router)
 
     return app
