@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
     redis = await get_redis()
     if redis:
-        logger.info("Redis client initialized")
+        logger.info("Redis client initialized — rate limiter will use Redis backend")
     else:
         logger.warning("Redis not configured — rate limiter will use in-memory fallback")
 
