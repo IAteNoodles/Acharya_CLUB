@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
+from app.api.v1.attendance import router as attendance_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.events import router as events_router
 from app.api.v1.health import router as health_router
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
             {"name": "Users", "description": "User management"},
             {"name": "Events", "description": "Event management"},
             {"name": "Registrations", "description": "Event registrations"},
+            {"name": "Attendance", "description": "Attendance tracking"},
         ],
     )
 
@@ -114,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(events_router)
     app.include_router(registrations_router)
+    app.include_router(attendance_router)
     app.include_router(users_router)
 
     return app
