@@ -76,3 +76,77 @@ class TestReportService:
         assert result.attendance.total == 0
         assert result.notifications.total == 0
         assert result.notifications.unread == 0
+
+
+class TestReportsAPI:
+
+    @pytest.mark.asyncio
+    async def test_dashboard_returns_stats(self):
+        from fastapi import FastAPI
+        from app.api.v1.reports import router
+        from app.api.deps import get_current_user
+        from app.core.exceptions import register_exception_handlers
+
+        app = FastAPI()
+        app.include_router(router)
+        register_exception_handlers(app)
+        app.dependency_overrides[get_current_user] = lambda: {"sub": str(uuid.uuid4()), "role": "admin"}
+
+        from app.services.reports import ReportService
+        from app.schemas.reports import DashboardResponse
+
+        mock_result = DashboardResponse(
+            users={"total": 100, "by_role": {"student": 80, "teacher": 15, "admin": 5}, "by_status": {"pending": 5, "active": 90, "rejected": 5}},
+            events={"total": 30, "by_status": {"draft": 5, "pending": 3, "approved": 20, "rejected": 2}, "by_type": {"in_college": 10, "out_college": 20}},
+            registrations={"total": 200, "by_status": {"pending": 30, "accepted": 150, "rejected": 20}},
+            attendance={"total": 500, "by_status": {"present": 400, "absent": 80, "late": 20}},
+            notifications={"total": 1000, "unread": 150},
+        )
+
+        with patch.object(ReportService, "get_dashboard_stats", new=AsyncMock(return_value=mock_result)):
+            from httpx import ASGITransport, AsyncClient
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.get("/api/v1/reports/dashboard")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["data"]["users"]["total"] == 100
+        assert data["data"]["notifications"]["unread"] == 150
+
+    @pytest.mark.asyncio
+    async def test_dashboard_forbidden_for_student(self):
+        from fastapi import FastAPI
+        from app.api.v1.reports import router
+        from app.api.deps import get_current_user
+        from app.core.exceptions import register_exception_handlers
+
+        app = FastAPI()
+        app.include_router(router)
+        register_exception_handlers(app)
+        app.dependency_overrides[get_current_user] = lambda: {"sub": str(uuid.uuid4()), "role": "student"}
+
+        from httpx import ASGITransport, AsyncClient
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/reports/dashboard")
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_dashboard_unauthorized(self):
+        from fastapi import FastAPI
+        from app.api.v1.reports import router
+        from app.api.deps import get_current_user
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_current_user] = lambda: None
+
+        from httpx import ASGITransport, AsyncClient
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/reports/dashboard")
+
+        assert resp.status_code == 401

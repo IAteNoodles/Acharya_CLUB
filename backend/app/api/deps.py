@@ -42,6 +42,11 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
 
 
 async def require_teacher_or_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
     role = current_user.get("role")
     if role not in ("teacher", "admin"):
         raise HTTPException(
