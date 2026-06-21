@@ -32,7 +32,7 @@ class TestNotificationService:
         db = AsyncMock()
 
         notif = await NotificationService.create_notification(
-            db, user_id=USER_ID, type="registration_accepted",
+            db, user_id=USER_ID, notif_type="registration_accepted",
             title="Accepted", message="You are accepted",
             entity_type="registration", entity_id=uuid.uuid4(),
         )
@@ -136,12 +136,9 @@ class TestNotificationService:
         from app.services.notification import NotificationService
 
         db = AsyncMock()
-        db.execute.return_value = MagicMock(
-            scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[
-                _make_notif(id=uuid.uuid4(), is_read=False),
-                _make_notif(id=uuid.uuid4(), is_read=False),
-            ])))
-        )
+        result_mock = MagicMock()
+        result_mock.rowcount = 2
+        db.execute.return_value = result_mock
 
         count = await NotificationService.mark_all_as_read(db, USER_ID)
 
@@ -153,9 +150,9 @@ class TestNotificationService:
         from app.services.notification import NotificationService
 
         db = AsyncMock()
-        db.execute.return_value = MagicMock(
-            scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
-        )
+        result_mock = MagicMock()
+        result_mock.rowcount = 0
+        db.execute.return_value = result_mock
 
         count = await NotificationService.mark_all_as_read(db, OTHER_USER_ID)
 

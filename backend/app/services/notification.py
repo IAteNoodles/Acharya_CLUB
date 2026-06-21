@@ -49,7 +49,7 @@ class NotificationService:
     async def create_notification(
         db: AsyncSession,
         user_id: uuid.UUID,
-        type: NotificationType,
+        notif_type: NotificationType,
         title: str,
         message: str,
         entity_type: Optional[str] = None,
@@ -57,7 +57,7 @@ class NotificationService:
     ) -> Notification:
         notif = Notification(
             user_id=user_id,
-            type=type,
+            type=notif_type,
             title=title,
             message=message,
             related_entity_type=entity_type,
@@ -118,18 +118,15 @@ class NotificationService:
         db: AsyncSession,
         user_id: uuid.UUID,
     ) -> int:
+        from sqlalchemy import update
         stmt = (
-            select(Notification)
+            update(Notification)
             .where(Notification.user_id == user_id, Notification.is_read == False)
+            .values(is_read=True)
         )
         result = await db.execute(stmt)
-        notifs = list(result.scalars().all())
-        count = len(notifs)
-        for n in notifs:
-            n.is_read = True
-        if count:
-            await db.commit()
-        return count
+        await db.commit()
+        return result.rowcount
 
     @staticmethod
     async def get_unread_count(
