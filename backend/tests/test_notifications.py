@@ -1,6 +1,9 @@
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, func
 
 USER_ID = uuid.uuid4()
@@ -179,3 +182,185 @@ class TestNotificationService:
         count = await NotificationService.get_unread_count(db, USER_ID)
 
         assert count == 0
+
+
+class TestNotificationAPI:
+    UUID_STR = str(uuid.uuid4())
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        self.student_user = {"sub": str(USER_ID), "role": "student"}
+        self.other_user = {"sub": str(OTHER_USER_ID), "role": "student"}
+
+    @pytest.mark.asyncio
+    async def test_list_notifications(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+        from app.api.deps import get_current_user
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_current_user] = lambda: self.student_user
+
+        from app.services.notification import NotificationService
+
+        mock_notif = MagicMock()
+        mock_notif.id = NOTIF_ID
+        mock_notif.user_id = USER_ID
+        mock_notif.type = "registration_accepted"
+        mock_notif.title = "Accepted"
+        mock_notif.message = "You are accepted"
+        mock_notif.is_read = False
+        mock_notif.created_at = datetime(2026, 6, 21, 10, 0, 0)
+        mock_notif.related_entity_type = None
+        mock_notif.related_entity_id = None
+
+        with patch.object(NotificationService, "get_user_notifications", new=AsyncMock(return_value=([mock_notif], 1))):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.get("/api/v1/notifications")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert len(data["data"]) == 1
+        assert data["data"][0]["title"] == "Accepted"
+
+    @pytest.mark.asyncio
+    async def test_list_notifications_unread_only(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+        from app.api.deps import get_current_user
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_current_user] = lambda: self.student_user
+
+        from app.services.notification import NotificationService
+
+        with patch.object(NotificationService, "get_user_notifications", new=AsyncMock(return_value=([], 0))):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.get("/api/v1/notifications?unread_only=true")
+
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_unread_count(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+        from app.api.deps import get_current_user
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_current_user] = lambda: self.student_user
+
+        from app.services.notification import NotificationService
+
+        with patch.object(NotificationService, "get_unread_count", new=AsyncMock(return_value=3)):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.get("/api/v1/notifications/unread-count")
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["count"] == 3
+
+    @pytest.mark.asyncio
+    async def test_mark_as_read(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+        from app.api.deps import get_current_user
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_current_user] = lambda: self.student_user
+
+        from app.services.notification import NotificationService
+
+        mock_notif = MagicMock()
+        mock_notif.id = NOTIF_ID
+        mock_notif.user_id = USER_ID
+        mock_notif.type = "registration_accepted"
+        mock_notif.title = "Accepted"
+        mock_notif.message = "You are accepted"
+        mock_notif.is_read = True
+        mock_notif.created_at = datetime(2026, 6, 21, 10, 0, 0)
+        mock_notif.related_entity_type = None
+        mock_notif.related_entity_id = None
+
+        with patch.object(NotificationService, "mark_as_read", new=AsyncMock(return_value=mock_notif)):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.patch(f"/api/v1/notifications/{NOTIF_ID}/read")
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["is_read"] is True
+
+    @pytest.mark.asyncio
+    async def test_mark_as_read_not_found(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+        from app.api.deps import get_current_user
+        from app.core.exceptions import NotFoundException, register_exception_handlers
+
+        app = FastAPI()
+        app.include_router(router)
+        register_exception_handlers(app)
+        app.dependency_overrides[get_current_user] = lambda: self.student_user
+
+        from app.services.notification import NotificationService
+
+        with patch.object(NotificationService, "mark_as_read", new=AsyncMock(side_effect=NotFoundException("Not found"))):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.patch(f"/api/v1/notifications/{NOTIF_ID}/read")
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_mark_all_as_read(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+        from app.api.deps import get_current_user
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_current_user] = lambda: self.student_user
+
+        from app.services.notification import NotificationService
+
+        with patch.object(NotificationService, "mark_all_as_read", new=AsyncMock(return_value=2)):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.patch("/api/v1/notifications/read-all")
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_notifications_unauthorized(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+
+        app = FastAPI()
+        app.include_router(router)
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/notifications")
+
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_mark_read_unauthorized(self):
+        from fastapi import FastAPI
+        from app.api.v1.notifications import router
+
+        app = FastAPI()
+        app.include_router(router)
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.patch(f"/api/v1/notifications/{NOTIF_ID}/read")
+
+        assert resp.status_code == 401
