@@ -228,8 +228,8 @@ class TestRegistrationService:
         )
 
         assert reg.status == RegistrationStatus.ACCEPTED
-        db.commit.assert_called_once()
-        db.refresh.assert_called_once()
+        assert db.commit.call_count == 2
+        assert db.refresh.call_count == 2
 
     @pytest.mark.asyncio
     async def test_accept_registration_not_found(self):

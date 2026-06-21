@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundException, ForbiddenException, ConflictException
 from app.models.event import Event, EventStatus, EventType
 from app.models.registration import Registration, RegistrationStatus
+from app.services.notification import NotificationService, NotificationType, _render_notification
 
 
 class RegistrationService:
@@ -137,6 +138,19 @@ class RegistrationService:
             raise ConflictException("Registration is not in pending status")
 
         reg.status = RegistrationStatus.ACCEPTED
+        title, message = _render_notification(
+            NotificationType.REGISTRATION_ACCEPTED,
+            {"event_title": event.title, "role": reg.role_type.value if hasattr(reg.role_type, "value") else reg.role_type},
+        )
+        await NotificationService.create_notification(
+            db,
+            user_id=reg.student_id,
+            notif_type=NotificationType.REGISTRATION_ACCEPTED,
+            title=title,
+            message=message,
+            entity_type="registration",
+            entity_id=reg.id,
+        )
         await db.commit()
         await db.refresh(reg)
         return reg
@@ -163,6 +177,19 @@ class RegistrationService:
             raise ConflictException("Registration is not in pending status")
 
         reg.status = RegistrationStatus.REJECTED
+        title, message = _render_notification(
+            NotificationType.REGISTRATION_REJECTED,
+            {"event_title": event.title, "role": reg.role_type.value if hasattr(reg.role_type, "value") else reg.role_type},
+        )
+        await NotificationService.create_notification(
+            db,
+            user_id=reg.student_id,
+            notif_type=NotificationType.REGISTRATION_REJECTED,
+            title=title,
+            message=message,
+            entity_type="registration",
+            entity_id=reg.id,
+        )
         await db.commit()
         await db.refresh(reg)
         return reg

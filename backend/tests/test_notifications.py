@@ -364,3 +364,60 @@ class TestNotificationAPI:
             resp = await client.patch(f"/api/v1/notifications/{NOTIF_ID}/read")
 
         assert resp.status_code == 401
+
+
+class TestRegistrationNotificationIntegration:
+
+    @pytest.mark.asyncio
+    async def test_accept_registration_creates_notification(self):
+        from app.services.registration import RegistrationService
+        from app.services.notification import NotificationService
+
+        coordinator_id = uuid.uuid4()
+        db = AsyncMock()
+        mock_reg = MagicMock()
+        mock_reg.status = "pending"
+        mock_reg.student_id = USER_ID
+        mock_reg.event_id = uuid.uuid4()
+        mock_reg.role_type = "volunteer"
+
+        mock_event = MagicMock()
+        mock_event.title = "Tech Fest"
+        mock_event.coordinator_id = coordinator_id
+
+        db.get = AsyncMock(side_effect=[mock_reg, mock_event])
+
+        with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
+            await RegistrationService.accept_registration(
+                db, NOTIF_ID,
+                {"sub": str(coordinator_id), "role": "teacher"},
+            )
+
+        mock_create.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_reject_registration_creates_notification(self):
+        from app.services.registration import RegistrationService
+        from app.services.notification import NotificationService
+
+        coordinator_id = uuid.uuid4()
+        db = AsyncMock()
+        mock_reg = MagicMock()
+        mock_reg.status = "pending"
+        mock_reg.student_id = USER_ID
+        mock_reg.event_id = uuid.uuid4()
+        mock_reg.role_type = "volunteer"
+
+        mock_event = MagicMock()
+        mock_event.title = "Tech Fest"
+        mock_event.coordinator_id = coordinator_id
+
+        db.get = AsyncMock(side_effect=[mock_reg, mock_event])
+
+        with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
+            await RegistrationService.reject_registration(
+                db, NOTIF_ID,
+                {"sub": str(coordinator_id), "role": "teacher"},
+            )
+
+        mock_create.assert_awaited_once()
