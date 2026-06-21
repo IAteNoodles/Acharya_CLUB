@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.event import Event, EventStatus, EventType
 from app.schemas.event import EventCreate
+from app.services.notification import NotificationService, NotificationType, _render_notification
 
 
 class EventService:
@@ -188,6 +189,19 @@ class EventService:
             raise ForbiddenException("Only teachers can approve as coordinators")
 
         event.status = EventStatus.APPROVED
+        title, message = _render_notification(
+            NotificationType.EVENT_APPROVED,
+            {"event_title": event.title},
+        )
+        await NotificationService.create_notification(
+            db,
+            user_id=event.created_by,
+            notif_type=NotificationType.EVENT_APPROVED,
+            title=title,
+            message=message,
+            entity_type="event",
+            entity_id=event.id,
+        )
         await db.commit()
         await db.refresh(event)
         return event
@@ -215,6 +229,19 @@ class EventService:
             raise ForbiddenException("Not authorized to reject this event")
 
         event.status = EventStatus.REJECTED
+        title, message = _render_notification(
+            NotificationType.EVENT_REJECTED,
+            {"event_title": event.title},
+        )
+        await NotificationService.create_notification(
+            db,
+            user_id=event.created_by,
+            notif_type=NotificationType.EVENT_REJECTED,
+            title=title,
+            message=message,
+            entity_type="event",
+            entity_id=event.id,
+        )
         await db.commit()
         await db.refresh(event)
         return event

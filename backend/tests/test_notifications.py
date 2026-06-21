@@ -421,3 +421,54 @@ class TestRegistrationNotificationIntegration:
             )
 
         mock_create.assert_awaited_once()
+
+
+class TestEventNotificationIntegration:
+
+    @pytest.mark.asyncio
+    async def test_approve_event_creates_notification(self):
+        from app.services.event import EventService
+        from app.services.notification import NotificationService
+
+        coordinator_id = uuid.uuid4()
+        db = AsyncMock()
+        mock_event = MagicMock()
+        mock_event.status = "pending"
+        mock_event.created_by = USER_ID
+        mock_event.coordinator_id = coordinator_id
+        mock_event.title = "Tech Fest"
+        mock_event.id = uuid.uuid4()
+
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
+            await EventService.approve_event(
+                db, str(uuid.uuid4()), None,
+                {"sub": str(coordinator_id), "role": "teacher"},
+            )
+
+        mock_create.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_reject_event_creates_notification(self):
+        from app.services.event import EventService
+        from app.services.notification import NotificationService
+
+        coordinator_id = uuid.uuid4()
+        db = AsyncMock()
+        mock_event = MagicMock()
+        mock_event.status = "pending"
+        mock_event.created_by = USER_ID
+        mock_event.coordinator_id = coordinator_id
+        mock_event.title = "Tech Fest"
+        mock_event.id = uuid.uuid4()
+
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
+            await EventService.reject_event(
+                db, str(uuid.uuid4()), "Not suitable",
+                {"sub": str(coordinator_id), "role": "teacher"},
+            )
+
+        mock_create.assert_awaited_once()
