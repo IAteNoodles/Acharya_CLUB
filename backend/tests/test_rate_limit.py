@@ -126,3 +126,22 @@ async def test_redis_different_keys_independent(fake_redis):
         assert resp.status_code == 200
         resp = await client.get("/b")
         assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_redis_rate_limiter_empty_oldest_edge_case(fake_redis):
+    from app.middleware.rate_limit import RedisRateLimiter
+
+    limiter = RedisRateLimiter(fake_redis)
+    allowed, retry_after = await limiter.check("test:empty", 5, 60)
+
+    assert allowed is True
+    assert retry_after == 0
+
+
+@pytest.mark.asyncio
+async def test_get_rate_limiter_with_explicit_redis(fake_redis):
+    from app.middleware.rate_limit import get_rate_limiter
+
+    dep = await get_rate_limiter(max_requests=10, window_seconds=60, redis_client=fake_redis)
+    assert dep is not None

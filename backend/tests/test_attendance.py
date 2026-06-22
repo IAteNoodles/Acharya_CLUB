@@ -287,6 +287,80 @@ class TestAttendanceService:
 
         assert total == 1
 
+    @pytest.mark.asyncio
+    async def test_get_event_attendance_event_not_found(self):
+        from app.services.attendance import AttendanceService
+
+        db = AsyncMock()
+        db.get.return_value = None
+
+        with pytest.raises(NotFoundException, match="Event not found"):
+            await AttendanceService.get_event_attendance(
+                db, EVENT_ID, {"sub": str(TEACHER_ID), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_event_attendance_with_date_filter(self):
+        from app.services.attendance import AttendanceService
+        from datetime import date
+
+        db = AsyncMock()
+        mock_event = MagicMock()
+        mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
+        db.get.return_value = mock_event
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = 1
+        att = MagicMock()
+        att.id = uuid.uuid4()
+        att.event_id = EVENT_ID
+        att.student_id = STUDENT_ID
+        att.attendance_date = date(2026, 7, 4)
+        att.status = "present"
+        data_result = MagicMock()
+        data_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[att]))
+        db.execute = AsyncMock(side_effect=[count_result, data_result])
+
+        records, total = await AttendanceService.get_event_attendance(
+            db, EVENT_ID, {"sub": str(TEACHER_ID), "role": "teacher"},
+            att_date=date(2026, 7, 4), page=1, limit=20,
+        )
+
+        assert total == 1
+
+    @pytest.mark.asyncio
+    async def test_get_student_attendance_with_event_filter(self):
+        from app.services.attendance import AttendanceService
+
+        db = AsyncMock()
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = 0
+        data_result = MagicMock()
+        data_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
+        db.execute = AsyncMock(side_effect=[count_result, data_result])
+
+        records, total = await AttendanceService.get_student_attendance(
+            db, str(STUDENT_ID), event_id=EVENT_ID, page=1, limit=20,
+        )
+
+        assert total == 0
+
+    @pytest.mark.asyncio
+    async def test_get_student_attendance_with_status_filter(self):
+        from app.services.attendance import AttendanceService
+
+        db = AsyncMock()
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = 0
+        data_result = MagicMock()
+        data_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
+        db.execute = AsyncMock(side_effect=[count_result, data_result])
+
+        records, total = await AttendanceService.get_student_attendance(
+            db, str(STUDENT_ID), status_filter="present", page=1, limit=20,
+        )
+
+        assert total == 0
+
 
 @pytest.fixture
 def coordinator_app():

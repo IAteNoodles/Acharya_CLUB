@@ -1,6 +1,7 @@
 import pytest
 from fastapi import Depends, FastAPI, HTTPException
 from httpx import AsyncClient, ASGITransport
+from fastapi import Depends
 from app.core.security import create_access_token, create_refresh_token
 
 
@@ -110,3 +111,41 @@ class TestRequireTeacherOrAdmin:
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             res = await ac.get("/api/v1/admin")
         assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+class TestRequireStudent:
+    @pytest.fixture
+    def app(self):
+        from fastapi import FastAPI
+        from app.api.deps import require_student, get_current_user
+
+        test_app = FastAPI()
+
+        @test_app.get("/api/v1/student-only")
+        async def student_only(current_user: dict = Depends(require_student)):
+            return {"message": "student access granted"}
+
+        return test_app
+
+    async def test_allows_student(self, app):
+        token = create_access_token(user_id="student-id", role="student")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            res = await ac.get("/api/v1/student-only", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+        assert res.json()["message"] == "student access granted"
+
+    async def test_rejects_teacher(self, app):
+        token = create_access_token(user_id="teacher-id", role="teacher")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            res = await ac.get("/api/v1/student-only", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 403
+
+    async def test_rejects_admin(self, app):
+        token = create_access_token(user_id="admin-id", role="admin")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            res = await ac.get("/api/v1/student-only", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 403

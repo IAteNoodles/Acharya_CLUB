@@ -92,3 +92,48 @@ def test_config_raises_on_missing_required():
     finally:
         if renamed:
             os.rename(env_path + ".bak", env_path)
+
+
+def test_config_builds_database_url_from_components():
+    for k in ["DATABASE_URL", "DB_PASSWORD"]:
+        if k in os.environ:
+            del os.environ[k]
+
+    os.environ["DB_PASSWORD"] = "my_secure_pass!"
+    os.environ["JWT_SECRET"] = "a" * 32
+
+    _reload_config()
+    from app.core.config import get_settings
+    settings = get_settings()
+
+    assert "DATABASE_URL" in settings.model_fields
+    assert "my_secure_pass" in settings.DATABASE_URL
+    assert settings.DATABASE_URL.startswith("postgresql+asyncpg://")
+
+
+def test_config_raises_on_placeholder_jwt_secret():
+    for k in ["DATABASE_URL", "JWT_SECRET"]:
+        if k in os.environ:
+            del os.environ[k]
+
+    os.environ["DATABASE_URL"] = "postgresql+asyncpg://u:p@localhost:5432/test"
+    os.environ["JWT_SECRET"] = "change-this-to-a-random-string-at-least-32-chars"
+
+    _reload_config()
+    with pytest.raises(ValueError, match="JWT_SECRET is still set"):
+        from app.core.config import Settings
+        Settings()
+
+
+def test_config_raises_on_short_jwt_secret():
+    for k in ["DATABASE_URL", "JWT_SECRET"]:
+        if k in os.environ:
+            del os.environ[k]
+
+    os.environ["DATABASE_URL"] = "postgresql+asyncpg://u:p@localhost:5432/test"
+    os.environ["JWT_SECRET"] = "short"
+
+    _reload_config()
+    with pytest.raises(ValueError, match="at least 32 characters"):
+        from app.core.config import Settings
+        Settings()

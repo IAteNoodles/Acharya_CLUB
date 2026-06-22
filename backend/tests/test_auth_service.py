@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 from app.schemas.auth import SignupRequest, LoginRequest
 
@@ -148,13 +149,26 @@ class TestLogin:
             )
         assert "not found" in str(exc.value).lower()
 
+    async def test_raises_on_inactive_user(self, mock_session, mock_user):
+        mock_user.status = "pending"
+        mock_session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=lambda: mock_user))
+
+        with patch("app.services.auth.verify_password", return_value=True):
+            from app.services.auth import login
+
+            with pytest.raises(Exception) as exc:
+                await login(
+                    db=mock_session,
+                    email="priya.singh@college.edu",
+                    password="SecurePass123",
+                )
+            assert "not active" in str(exc.value).lower()
+
 
 @pytest.mark.asyncio
 class TestRefresh:
     async def test_returns_new_tokens(self):
-        from unittest.mock import AsyncMock, MagicMock
         from app.models.user import User
-        import uuid
 
         user = User(id=uuid.uuid4(), name="Test", email="test@test.com")
         user.role = "admin"
@@ -179,6 +193,60 @@ class TestRefresh:
         assert result["accessToken"] == "new-access-token"
         assert result["refreshToken"] == "new-refresh-token"
 
+    async def test_raises_on_wrong_token_type(self):
+        from app.models.user import User
+        from fastapi import HTTPException
+
+        user = User(id=uuid.uuid4(), name="Test", email="test@test.com")
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = user
+
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = mock_result
+
+        payload = {"sub": str(user.id), "type": "access"}
+
+        with patch("app.services.auth.verify_token", return_value=payload):
+            from app.services.auth import refresh
+
+            with pytest.raises(HTTPException) as exc:
+                await refresh(db=mock_db, refresh_token="old-token")
+            assert exc.value.status_code == 401
+            assert "Invalid token type" in str(exc.value.detail)
+
+    async def test_raises_on_blacklisted_token(self):
+        from app.models.user import User
+        from app.services.auth import refresh, _blacklisted_tokens
+
+        _blacklisted_tokens.clear()
+
+        user = User(id=uuid.uuid4(), name="Test", email="test@test.com")
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=user))
+
+        payload = {"sub": str(user.id), "type": "refresh"}
+        _blacklisted_tokens.add("revoked-token")
+
+        with patch("app.services.auth.verify_token", return_value=payload):
+            from app.services.auth import refresh
+
+            with pytest.raises(Exception) as exc:
+                await refresh(db=mock_db, refresh_token="revoked-token")
+            assert "revoked" in str(exc.value).lower()
+
+    async def test_raises_on_user_not_found(self):
+        from app.services.auth import refresh
+
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+
+        payload = {"sub": "550e8400-e29b-41d4-a716-446655440000", "type": "refresh"}
+
+        with patch("app.services.auth.verify_token", return_value=payload):
+            with pytest.raises(Exception) as exc:
+                await refresh(db=mock_db, refresh_token="valid-token")
+            assert "not found" in str(exc.value).lower()
+
 
 @pytest.mark.asyncio
 class TestLogout:
@@ -187,3 +255,55 @@ class TestLogout:
 
         await logout(refresh_token="token-to-blacklist")
         assert "token-to-blacklist" in _blacklisted_tokens
+
+
+@pytest.mark.asyncio
+class TestGetMe:
+    async def test_returns_user_when_found(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from app.services.auth import get_me
+        from datetime import datetime
+
+        mock_user = MagicMock()
+        mock_user.id = "550e8400-e29b-41d4-a716-446655440000"
+        mock_user.name = "Priya Singh"
+        mock_user.email = "priya@college.edu"
+        mock_user.role = "student"
+        mock_user.status = "active"
+        mock_user.created_at = datetime(2026, 1, 1, 0, 0, 0)
+        mock_user.updated_at = datetime(2026, 1, 2, 0, 0, 0)
+
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_user
+        mock_session.execute.return_value = mock_result
+
+        result = await get_me(db=mock_session, user_id="550e8400-e29b-41d4-a716-446655440000")
+
+        assert result["id"] == "550e8400-e29b-41d4-a716-446655440000"
+        assert result["name"] == "Priya Singh"
+        assert result["role"] == "student"
+        assert result["status"] == "active"
+        assert result["created_at"] == "2026-01-01T00:00:00"
+        assert result["updated_at"] == "2026-01-02T00:00:00"
+
+    async def test_raises_value_error_on_invalid_uuid(self):
+        from app.services.auth import get_me
+        from unittest.mock import AsyncMock
+
+        with pytest.raises(ValueError, match="badly formed hexadecimal UUID string"):
+            await get_me(db=AsyncMock(), user_id="not-a-uuid")
+
+    async def test_raises_404_when_user_not_found(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from app.services.auth import get_me
+
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
+
+        with pytest.raises(Exception) as exc:
+            await get_me(db=mock_session, user_id="550e8400-e29b-41d4-a716-446655440000")
+
+        assert "not found" in str(exc.value).lower()

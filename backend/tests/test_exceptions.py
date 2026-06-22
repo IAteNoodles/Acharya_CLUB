@@ -54,3 +54,45 @@ def test_exception_handlers_register():
     app = FastAPI()
     register_exception_handlers(app)
     assert len(app.exception_handlers) > 0
+
+
+def test_validation_exception_handler_includes_errors():
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.get("/test")
+    async def test_route():
+        raise ValidationException(
+            errors=[{"loc": ["email"], "msg": "Invalid format"}],
+            detail="Validation failed",
+        )
+
+    from fastapi.testclient import TestClient
+    client = TestClient(app)
+    resp = client.get("/test")
+
+    assert resp.status_code == 422
+    data = resp.json()
+    assert data["success"] is False
+    assert data["error"]["code"] == "VALIDATION_ERROR"
+    assert "details" in data["error"]
+    assert data["error"]["details"] == [{"loc": ["email"], "msg": "Invalid format"}]
+
+
+def test_unhandled_exception_handler():
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.get("/panic")
+    async def panic():
+        raise RuntimeError("something went terribly wrong")
+
+    from fastapi.testclient import TestClient
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/panic")
+
+    assert resp.status_code == 500
+    data = resp.json()
+    assert data["success"] is False
+    assert data["error"]["code"] == "INTERNAL_ERROR"
+    assert "Internal server error" in data["error"]["message"]

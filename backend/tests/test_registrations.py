@@ -260,6 +260,122 @@ class TestRegistrationService:
 
         assert reg.status == RegistrationStatus.REJECTED
 
+    @pytest.mark.asyncio
+    async def test_register_max_capacity_reached(self):
+        from app.services.registration import RegistrationService
+
+        db = AsyncMock()
+        mock_event = MagicMock()
+        mock_event.status = "approved"
+        mock_event.coordinator_id = uuid.uuid4()
+        mock_event.max_registrations = 2
+        db.get.return_value = mock_event
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = 2
+        db.execute = AsyncMock(side_effect=[count_result, MagicMock(scalar_one_or_none=MagicMock(return_value=None))])
+
+        with pytest.raises(ConflictException, match="maximum registration capacity"):
+            await RegistrationService.register(
+                db, EVENT_ID, "participant",
+                {"sub": str(STUDENT_ID), "role": "student"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_student_registrations_with_status_filter(self):
+        from app.services.registration import RegistrationService
+
+        db = AsyncMock()
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = 0
+        data_result = MagicMock()
+        data_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
+        db.execute = AsyncMock(side_effect=[count_result, data_result])
+
+        registrations, total = await RegistrationService.get_student_registrations(
+            db, str(STUDENT_ID), status_filter="accepted", page=1, limit=20,
+        )
+
+        assert total == 0
+
+    @pytest.mark.asyncio
+    async def test_get_event_registrations_event_not_found(self):
+        from app.services.registration import RegistrationService
+
+        db = AsyncMock()
+        db.get.return_value = None
+
+        with pytest.raises(NotFoundException, match="Event not found"):
+            await RegistrationService.get_event_registrations(
+                db, EVENT_ID, {"sub": str(TEACHER_ID), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_event_registrations_with_status_filter(self):
+        from app.services.registration import RegistrationService
+
+        db = AsyncMock()
+        mock_event = MagicMock()
+        mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
+        db.get.return_value = mock_event
+        count_result = MagicMock()
+        count_result.scalar_one.return_value = 0
+        data_result = MagicMock()
+        data_result.scalars.return_value = MagicMock(all=MagicMock(return_value=[]))
+        db.execute = AsyncMock(side_effect=[count_result, data_result])
+
+        registrations, total = await RegistrationService.get_event_registrations(
+            db, EVENT_ID, {"sub": str(TEACHER_ID), "role": "teacher"},
+            status_filter="accepted", page=1, limit=20,
+        )
+        assert total == 0
+
+    @pytest.mark.asyncio
+    async def test_accept_registration_event_not_found(self):
+        from app.services.registration import RegistrationService
+
+        db = AsyncMock()
+        mock_reg = MagicMock()
+        mock_reg.status = RegistrationStatus.PENDING
+        mock_reg.event_id = EVENT_ID
+        db.get.side_effect = [mock_reg, None]
+
+        with pytest.raises(NotFoundException, match="Event not found"):
+            await RegistrationService.accept_registration(
+                db, REG_ID, {"sub": str(TEACHER_ID), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_reject_registration_event_not_found(self):
+        from app.services.registration import RegistrationService
+
+        db = AsyncMock()
+        mock_reg = MagicMock()
+        mock_reg.status = RegistrationStatus.PENDING
+        mock_reg.event_id = EVENT_ID
+        db.get.side_effect = [mock_reg, None]
+
+        with pytest.raises(NotFoundException, match="Event not found"):
+            await RegistrationService.reject_registration(
+                db, REG_ID, {"sub": str(TEACHER_ID), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_reject_registration_not_pending(self):
+        from app.services.registration import RegistrationService
+
+        db = AsyncMock()
+        mock_reg = MagicMock()
+        mock_reg.status = RegistrationStatus.ACCEPTED
+        mock_reg.event_id = EVENT_ID
+        mock_event = MagicMock()
+        mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
+        db.get.side_effect = [mock_reg, mock_event]
+
+        with pytest.raises(ConflictException, match="not in pending status"):
+            await RegistrationService.reject_registration(
+                db, REG_ID, {"sub": str(TEACHER_ID), "role": "teacher"},
+            )
+
 @pytest.fixture
 def student_app():
     from fastapi import FastAPI
