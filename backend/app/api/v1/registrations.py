@@ -9,8 +9,6 @@ from app.core.database import get_db
 from app.schemas.common import SuccessResponse, PaginatedResponse, PaginatedMeta
 from app.schemas.registration import (
     EventBrief,
-    ProofUploadRequest,
-    ProofUploadResponse,
     RegisterRequest,
     RegistrationResponse,
     RegistrationWithEventResponse,
@@ -92,19 +90,6 @@ async def reject_registration(
 ):
     reg = await RegistrationService.reject_registration(db, id, current_user)
     return SuccessResponse(data=_reg_to_response(reg))
-
-
-@router.post("/{id}/proof")
-async def request_proof_upload(
-    id: uuid.UUID,
-    request: ProofUploadRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(require_student),
-):
-    result = await RegistrationService.request_proof_url(
-        db, id, current_user, request.file_name,
-    )
-    return SuccessResponse(data=ProofUploadResponse(**result))
 
 
 def _reg_to_response(reg) -> dict:

@@ -3,14 +3,12 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
-ALLOWED_BROCHURE_TYPES = {"application/pdf", "image/jpeg", "image/png"}
-
-
 class EventCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     event_type: str
     category: str
+    venue: str = Field(..., min_length=1, max_length=300)
     start_date: datetime
     end_date: datetime
 
@@ -64,25 +62,6 @@ class EventAssignCoordinator(BaseModel):
         return v
 
 
-class EventBrochureRequest(BaseModel):
-    file_name: str = Field(..., min_length=1)
-    file_type: str = Field(..., min_length=1)
-
-    @field_validator("file_type")
-    @classmethod
-    def validate_file_type(cls, v: str) -> str:
-        if v not in ALLOWED_BROCHURE_TYPES:
-            raise ValueError(
-                f"file_type must be one of {ALLOWED_BROCHURE_TYPES}, got '{v}'"
-            )
-        return v
-
-
-class EventBrochureResponse(BaseModel):
-    upload_url: str
-    file_key: str
-
-
 class UserBrief(BaseModel):
     id: str
     name: str
@@ -103,8 +82,6 @@ class EventOut(BaseModel):
     start_date: datetime
     end_date: datetime
     max_registrations: int
-    brochure_url: Optional[str] = None
-    brochure_file_key: Optional[str] = None
     created_by: Optional[UserBrief] = None
     coordinator: Optional[UserBrief] = None
     created_at: datetime

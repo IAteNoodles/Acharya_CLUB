@@ -491,7 +491,10 @@ class TestTeacherNotificationIntegration:
         mock_user.created_at = MagicMock()
         mock_user.updated_at = MagicMock()
 
-        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_user))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_user
+        mock_result.scalar_one.return_value = mock_user
+        db.execute.return_value = mock_result
 
         with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
             await approve_teacher(db, str(USER_ID))
@@ -513,7 +516,10 @@ class TestTeacherNotificationIntegration:
         mock_user.created_at = MagicMock()
         mock_user.updated_at = MagicMock()
 
-        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_user))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_user
+        mock_result.scalar_one.return_value = mock_user
+        db.execute.return_value = mock_result
 
         with patch.object(NotificationService, "create_notification", new=AsyncMock()) as mock_create:
             await reject_teacher(db, str(USER_ID))

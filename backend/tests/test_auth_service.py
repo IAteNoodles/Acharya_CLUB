@@ -152,7 +152,20 @@ class TestLogin:
 @pytest.mark.asyncio
 class TestRefresh:
     async def test_returns_new_tokens(self):
-        payload = {"sub": "user-id", "type": "refresh"}
+        from unittest.mock import AsyncMock, MagicMock
+        from app.models.user import User
+        import uuid
+
+        user = User(id=uuid.uuid4(), name="Test", email="test@test.com")
+        user.role = "admin"
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = user
+
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = mock_result
+
+        payload = {"sub": str(user.id), "type": "refresh"}
 
         with (
             patch("app.services.auth.verify_token", return_value=payload),
@@ -161,7 +174,7 @@ class TestRefresh:
         ):
             from app.services.auth import refresh
 
-            result = await refresh(refresh_token="old-refresh-token")
+            result = await refresh(db=mock_db, refresh_token="old-refresh-token")
 
         assert result["accessToken"] == "new-access-token"
         assert result["refreshToken"] == "new-refresh-token"

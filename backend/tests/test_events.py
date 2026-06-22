@@ -11,6 +11,7 @@ class TestEventSchemas:
             title="Tech Fest",
             event_type="in_college",
             category="both",
+            venue="Main Auditorium",
             start_date=datetime.utcnow() + timedelta(days=1),
             end_date=datetime.utcnow() + timedelta(days=2),
         )
@@ -25,6 +26,7 @@ class TestEventSchemas:
                 title="",
                 event_type="in_college",
                 category="both",
+                venue="Main Auditorium",
                 start_date=datetime.utcnow() + timedelta(days=1),
                 end_date=datetime.utcnow() + timedelta(days=2),
             )
@@ -37,21 +39,10 @@ class TestEventSchemas:
                 title="Fest",
                 event_type="invalid",
                 category="both",
+                venue="Main Auditorium",
                 start_date=datetime.utcnow() + timedelta(days=1),
                 end_date=datetime.utcnow() + timedelta(days=2),
             )
-
-    def test_brochure_request_valid(self):
-        from app.schemas.event import EventBrochureRequest
-
-        data = EventBrochureRequest(file_name="brochure.pdf", file_type="application/pdf")
-        assert data.file_name == "brochure.pdf"
-
-    def test_brochure_request_rejects_invalid_type(self):
-        from app.schemas.event import EventBrochureRequest
-
-        with pytest.raises(ValidationError):
-            EventBrochureRequest(file_name="bad.exe", file_type="application/x-msdownload")
 
     def test_reject_schema_requires_comment(self):
         from app.schemas.event import EventReject
@@ -100,6 +91,7 @@ class TestEventService:
                     title="Test",
                     event_type="in_college",
                     category="both",
+                    venue="Auditorium",
                     start_date=datetime.utcnow() - timedelta(days=10),
                     end_date=datetime.utcnow() - timedelta(days=5),
                 ),
@@ -188,8 +180,6 @@ class TestEventsAPI:
         mock_event.start_date = datetime.utcnow() + timedelta(days=1)
         mock_event.end_date = datetime.utcnow() + timedelta(days=2)
         mock_event.max_registrations = 0
-        mock_event.brochure_url = None
-        mock_event.brochure_file_key = None
         mock_event.creator = None
         mock_event.coordinator = None
         mock_event.created_at = datetime.utcnow()
@@ -202,6 +192,7 @@ class TestEventsAPI:
                     "title": "Tech Fest",
                     "event_type": "in_college",
                     "category": "both",
+                    "venue": "Main Auditorium",
                     "start_date": (datetime.utcnow() + timedelta(days=1)).isoformat(),
                     "end_date": (datetime.utcnow() + timedelta(days=2)).isoformat(),
                 })
@@ -235,8 +226,6 @@ class TestEventsAPI:
         mock_event.start_date = datetime.utcnow()
         mock_event.end_date = datetime.utcnow()
         mock_event.max_registrations = 0
-        mock_event.brochure_url = None
-        mock_event.brochure_file_key = None
         mock_event.creator = None
         mock_event.coordinator = None
         mock_event.created_at = datetime.utcnow()
@@ -284,8 +273,6 @@ class TestEventsAPI:
         mock_event.start_date = datetime.utcnow()
         mock_event.end_date = datetime.utcnow()
         mock_event.max_registrations = 0
-        mock_event.brochure_url = None
-        mock_event.brochure_file_key = None
         mock_event.creator = None
         mock_event.coordinator = None
         mock_event.created_at = datetime.utcnow()
@@ -315,8 +302,6 @@ class TestEventsAPI:
         mock_event.start_date = datetime.utcnow()
         mock_event.end_date = datetime.utcnow()
         mock_event.max_registrations = 0
-        mock_event.brochure_url = None
-        mock_event.brochure_file_key = None
         mock_event.creator = None
         mock_event.coordinator = None
         mock_event.created_at = datetime.utcnow()
@@ -347,8 +332,6 @@ class TestEventsAPI:
         mock_event.start_date = datetime.utcnow()
         mock_event.end_date = datetime.utcnow()
         mock_event.max_registrations = 0
-        mock_event.brochure_url = None
-        mock_event.brochure_file_key = None
         mock_event.creator = None
         mock_event.coordinator = None
         mock_event.created_at = datetime.utcnow()
@@ -389,8 +372,6 @@ class TestEventsAPI:
         mock_event.start_date = datetime.utcnow()
         mock_event.end_date = datetime.utcnow()
         mock_event.max_registrations = 0
-        mock_event.brochure_url = None
-        mock_event.brochure_file_key = None
         mock_event.creator = None
         mock_event.coordinator = None
         mock_event.coordinator_id = None
@@ -406,42 +387,6 @@ class TestEventsAPI:
                 )
 
             assert resp.status_code == 200
-
-    @pytest.mark.asyncio
-    async def test_brochure_request(self, api_app):
-        from httpx import ASGITransport, AsyncClient
-        from unittest.mock import patch
-
-        with patch("app.services.event.EventService.request_brochure_url") as mock_brochure:
-            mock_brochure.return_value = {
-                "upload_url": "http://localhost:8000/mock-upload/brochures/key.pdf",
-                "file_key": "brochures/key.pdf",
-            }
-
-            transport = ASGITransport(app=api_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                resp = await client.post(
-                    "/api/v1/events/550e8400-e29b-41d4-a716-446655440000/brochure",
-                    json={"file_name": "brochure.pdf", "file_type": "application/pdf"},
-                )
-
-            assert resp.status_code == 200
-            data = resp.json()
-            assert "upload_url" in data
-            assert "file_key" in data
-
-    @pytest.mark.asyncio
-    async def test_brochure_request_invalid_type(self, api_app):
-        from httpx import ASGITransport, AsyncClient
-
-        transport = ASGITransport(app=api_app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post(
-                "/api/v1/events/550e8400-e29b-41d4-a716-446655440000/brochure",
-                json={"file_name": "bad.exe", "file_type": "application/x-msdownload"},
-            )
-
-        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_events_require_auth(self):

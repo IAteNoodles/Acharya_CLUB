@@ -1,29 +1,14 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 
 from app.models.registration import RegistrationRole, RegistrationStatus
-
-
-ALLOWED_PROOF_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 
 
 class RegisterRequest(BaseModel):
     event_id: uuid.UUID
     role_type: RegistrationRole
-
-
-class ProofUploadRequest(BaseModel):
-    file_name: str = Field(..., min_length=1, max_length=255)
-    file_type: str = Field(..., min_length=1)
-
-    @field_validator("file_type")
-    @classmethod
-    def validate_file_type(cls, v: str) -> str:
-        if v not in ALLOWED_PROOF_TYPES:
-            raise ValueError(f"file_type must be one of {ALLOWED_PROOF_TYPES}, got '{v}'")
-        return v
 
 
 class EventBrief(BaseModel):
@@ -79,10 +64,3 @@ class RegistrationWithStudentResponse(BaseModel):
     student: StudentBrief
 
     model_config = {"from_attributes": True}
-
-
-class ProofUploadResponse(BaseModel):
-    success: bool = True
-    upload_url: str
-    file_key: str
-    expires_in: int

@@ -12,6 +12,7 @@ import app.models.user  # noqa: F401
 import app.models.event  # noqa: F401
 import app.models.registration  # noqa: F401
 import app.models.attendance  # noqa: F401
+import app.models.notification  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

@@ -22,8 +22,8 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
         "success": True,
         "data": {
             "user": UserResponse(**result["user"]),
-            "accessToken": result["access_token"],
-            "refreshToken": result["refresh_token"],
+            "accessToken": result["accessToken"],
+            "refreshToken": result["refreshToken"],
         },
     }
 
@@ -35,20 +35,20 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         "success": True,
         "data": {
             "user": UserResponse(**result["user"]),
-            "accessToken": result["access_token"],
-            "refreshToken": result["refresh_token"],
+            "accessToken": result["accessToken"],
+            "refreshToken": result["refreshToken"],
         },
     }
 
 
 @router.post("/refresh")
 async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    result = await auth_service.refresh(refresh_token=data.refreshToken)
+    result = await auth_service.refresh(db=db, refresh_token=data.refreshToken)
     return {
         "success": True,
         "data": {
-            "accessToken": result["access_token"],
-            "refreshToken": result["refresh_token"],
+            "accessToken": result["accessToken"],
+            "refreshToken": result["refreshToken"],
         },
     }
 
@@ -56,10 +56,9 @@ async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
 @router.post("/logout")
 async def logout(
     data: RefreshRequest,
-    db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    await auth_service.logout(db=db, refresh_token=data.refreshToken)
+    await auth_service.logout(refresh_token=data.refreshToken)
     return {"success": True, "data": {"message": "Logged out successfully"}}
 
 

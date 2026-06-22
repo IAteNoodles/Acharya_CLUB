@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,7 +96,7 @@ async def login(db: AsyncSession, email: str, password: str) -> dict:
     }
 
 
-async def refresh(refresh_token: str) -> dict:
+async def refresh(db: AsyncSession, refresh_token: str) -> dict:
     from fastapi import HTTPException, status
 
     try:
@@ -120,7 +122,16 @@ async def refresh(refresh_token: str) -> dict:
         )
 
     user_id = payload["sub"]
-    new_access = create_access_token(user_id=user_id, role="student")
+    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    actual_role = _enum_val(user.role)
+
+    new_access = create_access_token(user_id=user_id, role=actual_role)
     new_refresh = create_refresh_token(user_id=user_id)
 
     _blacklisted_tokens.add(refresh_token)
@@ -134,7 +145,6 @@ async def logout(refresh_token: str) -> dict:
 
 
 async def get_me(db: AsyncSession, user_id: str) -> dict:
-    import uuid
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
 

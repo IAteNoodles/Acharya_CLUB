@@ -174,6 +174,7 @@ class TestUserService:
         )
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
+        mock_result.scalar_one.return_value = mock_user
         mock_session.execute = AsyncMock(return_value=mock_result)
         mock_session.commit = AsyncMock()
         mock_session.refresh = AsyncMock()
@@ -272,6 +273,7 @@ class TestUserService:
         )
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
+        mock_result.scalar_one.return_value = mock_user
         mock_session.execute = AsyncMock(return_value=mock_result)
         mock_session.commit = AsyncMock()
         mock_session.refresh = AsyncMock()

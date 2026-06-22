@@ -1,4 +1,3 @@
-import asyncio
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
@@ -13,7 +12,7 @@ from app.schemas.reports import (
 
 
 def _grouped_counts(rows) -> dict:
-    return {str(r[0]): r[1] for r in rows}
+    return {r[0].value if hasattr(r[0], 'value') else str(r[0]): r[1] for r in rows}
 
 
 def _total_from_counts(counts: dict) -> int:
@@ -68,25 +67,14 @@ class ReportService:
                 select(func.count(Notification.id)).where(Notification.is_read == False)
             ) or 0
 
-        (
-            users_by_role,
-            users_by_status,
-            events_by_status,
-            events_by_type,
-            regs_by_status,
-            att_by_status,
-            notif_total,
-            notif_unread,
-        ) = await asyncio.gather(
-            count_users_by_role(),
-            count_users_by_status(),
-            count_events_by_status(),
-            count_events_by_type(),
-            count_registrations_by_status(),
-            count_attendance_by_status(),
-            count_notifications_total(),
-            count_notifications_unread(),
-        )
+        users_by_role = await count_users_by_role()
+        users_by_status = await count_users_by_status()
+        events_by_status = await count_events_by_status()
+        events_by_type = await count_events_by_type()
+        regs_by_status = await count_registrations_by_status()
+        att_by_status = await count_attendance_by_status()
+        notif_total = await count_notifications_total()
+        notif_unread = await count_notifications_unread()
 
         return DashboardResponse(
             users=UserStats(

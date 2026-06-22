@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundException, ForbiddenException, ConflictException
-from app.models.event import Event, EventStatus, EventType
+from app.models.event import Event, EventStatus
 from app.models.registration import Registration, RegistrationStatus
 from app.services.notification import NotificationService, NotificationType, _render_notification
 
@@ -27,10 +27,21 @@ class RegistrationService:
         if not event.coordinator_id:
             raise ConflictException("Event has no coordinator assigned")
 
+        if event.max_registrations > 0:
+            count_result = await db.execute(
+                select(func.count()).select_from(Registration).where(
+                    Registration.event_id == event_id,
+                    Registration.status == RegistrationStatus.ACCEPTED,
+                )
+            )
+            accepted_count = count_result.scalar_one()
+            if accepted_count >= event.max_registrations:
+                raise ConflictException("Event has reached its maximum registration capacity")
+
         result = await db.execute(
             select(Registration).where(
                 Registration.event_id == event_id,
-                Registration.student_id == current_user["sub"],
+                Registration.student_id == uuid.UUID(current_user["sub"]),
                 Registration.role_type == role_type,
             )
         )
@@ -39,7 +50,7 @@ class RegistrationService:
 
         reg = Registration(
             event_id=event_id,
-            student_id=current_user["sub"],
+            student_id=uuid.UUID(current_user["sub"]),
             role_type=role_type,
         )
         db.add(reg)
@@ -194,30 +205,4 @@ class RegistrationService:
         await db.refresh(reg)
         return reg
 
-    @staticmethod
-    async def request_proof_url(
-        db: AsyncSession,
-        registration_id: uuid.UUID,
-        current_user: dict,
-        file_name: str,
-    ) -> dict:
-        reg = await db.get(Registration, registration_id)
-        if not reg:
-            raise NotFoundException("Registration not found")
 
-        if str(reg.student_id) != current_user["sub"]:
-            raise ForbiddenException("This registration does not belong to you")
-
-        event = await db.get(Event, reg.event_id)
-        if not event:
-            raise NotFoundException("Event not found")
-        if event.event_type != EventType.OUT_COLLEGE:
-            raise ConflictException("Proof upload is only for out-college events")
-        if reg.status != RegistrationStatus.ACCEPTED:
-            raise ConflictException("Registration must be accepted before uploading proof")
-
-        return {
-            "upload_url": f"https://mock-s3.example.com/proofs/{registration_id}/{file_name}",
-            "file_key": f"proofs/{registration_id}/{file_name}",
-            "expires_in": 300,
-        }

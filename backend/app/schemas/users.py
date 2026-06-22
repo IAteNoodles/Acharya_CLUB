@@ -13,9 +13,11 @@ class UserOut(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    @field_validator("id")
+    @field_validator("id", mode="before")
     @classmethod
-    def validate_uuid(cls, v: str) -> str:
+    def validate_uuid(cls, v):
+        if isinstance(v, uuid.UUID):
+            v = str(v)
         uuid.UUID(v)
         return v
 

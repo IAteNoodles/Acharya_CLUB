@@ -5,6 +5,8 @@ pytestmark = pytest.mark.asyncio
 
 async def test_get_redis_returns_none_when_no_url(monkeypatch):
     monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.delenv("UPSTASH_REDIS_REST_URL", raising=False)
+    monkeypatch.delenv("UPSTASH_REDIS_REST_TOKEN", raising=False)
     import importlib
     from app.core import redis as redis_module
     importlib.reload(redis_module)

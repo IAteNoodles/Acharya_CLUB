@@ -10,11 +10,9 @@ from app.schemas.event import (
     EventApprove,
     EventReject,
     EventAssignCoordinator,
-    EventBrochureRequest,
     EventOut,
     EventListItem,
     PaginatedResponse,
-    EventBrochureResponse,
 )
 from app.services.event import EventService
 
@@ -128,20 +126,7 @@ async def assign_coordinator(
     return _event_to_out(event)
 
 
-@router.post("/{event_id}/brochure", response_model=EventBrochureResponse)
-async def request_brochure_url(
-    event_id: str,
-    data: EventBrochureRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    result = await EventService.request_brochure_url(
-        db, event_id, data.file_name, data.file_type, current_user,
-    )
-    return EventBrochureResponse(**result)
-
-
-def _event_to_out(event) -> dict:
+def _event_to_out(event) -> EventOut:
     return EventOut(
         id=str(event.id),
         title=event.title,
@@ -153,8 +138,6 @@ def _event_to_out(event) -> dict:
         start_date=event.start_date,
         end_date=event.end_date,
         max_registrations=event.max_registrations,
-        brochure_url=event.brochure_url,
-        brochure_file_key=event.brochure_file_key,
         created_by={
             "id": str(event.creator.id),
             "name": event.creator.name,

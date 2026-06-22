@@ -3,7 +3,9 @@ name = "acharya-club-backend"
 version = "1.0.0"
 description = "Acharya_CLUB - College Event Management System Backend"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "sqlalchemy[asyncio]>=2.0.51",
+]
 
 [build-system]
 requires = ["setuptools>=75.0"]
@@ -11,3 +13,20 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "e2e: marks tests as end-to-end (uses testcontainers, session-scoped loop)",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-m 'not e2e'"
+
+[dependency-groups]
+dev = [
+    "asyncpg>=0.31.0",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]

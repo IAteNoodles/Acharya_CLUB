@@ -7,7 +7,6 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api import deps
 from app.core.exceptions import ConflictException, ForbiddenException, NotFoundException
-from app.models.event import EventType
 from app.models.registration import RegistrationRole, RegistrationStatus
 
 STUDENT_ID = uuid.uuid4()
@@ -36,25 +35,6 @@ class TestRegistrationSchemas:
         with pytest.raises(ValidationError):
             RegisterRequest(event_id=EVENT_ID, role_type="invalid")
 
-    def test_proof_upload_request_valid(self):
-        from app.schemas.registration import ProofUploadRequest
-
-        data = ProofUploadRequest(file_name="proof.pdf", file_type="application/pdf")
-        assert data.file_name == "proof.pdf"
-
-    def test_proof_upload_request_rejects_invalid_type(self):
-        from app.schemas.registration import ProofUploadRequest
-
-        with pytest.raises(ValidationError):
-            ProofUploadRequest(file_name="bad.exe", file_type="application/x-msdownload")
-
-    def test_proof_upload_request_rejects_empty_name(self):
-        from app.schemas.registration import ProofUploadRequest
-
-        with pytest.raises(ValidationError):
-            ProofUploadRequest(file_name="", file_type="image/jpeg")
-
-
 class TestRegistrationService:
     @pytest.mark.asyncio
     async def test_register_success(self):
@@ -64,6 +44,7 @@ class TestRegistrationService:
         mock_event = MagicMock()
         mock_event.status = "approved"
         mock_event.coordinator_id = uuid.uuid4()
+        mock_event.max_registrations = 0
         db.get.return_value = mock_event
         db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=None))
 
@@ -129,6 +110,7 @@ class TestRegistrationService:
         mock_event = MagicMock()
         mock_event.status = "approved"
         mock_event.coordinator_id = uuid.uuid4()
+        mock_event.max_registrations = 0
         db.get.return_value = mock_event
         db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock()))
 
@@ -277,78 +259,6 @@ class TestRegistrationService:
         )
 
         assert reg.status == RegistrationStatus.REJECTED
-
-    @pytest.mark.asyncio
-    async def test_request_proof_url_success(self):
-        from app.services.registration import RegistrationService
-
-        db = AsyncMock()
-        mock_reg = MagicMock()
-        mock_reg.student_id = STUDENT_ID
-        mock_reg.event_id = EVENT_ID
-        mock_reg.status = RegistrationStatus.ACCEPTED
-        mock_event = MagicMock()
-        mock_event.event_type = EventType.OUT_COLLEGE
-        db.get.side_effect = [mock_reg, mock_event]
-
-        result = await RegistrationService.request_proof_url(
-            db, REG_ID, {"sub": str(STUDENT_ID), "role": "student"}, "proof.pdf",
-        )
-
-        assert "upload_url" in result
-        assert "file_key" in result
-        assert result["expires_in"] == 300
-
-    @pytest.mark.asyncio
-    async def test_request_proof_url_not_owner(self):
-        from app.services.registration import RegistrationService
-
-        db = AsyncMock()
-        mock_reg = MagicMock()
-        mock_reg.student_id = uuid.uuid4()
-        db.get.return_value = mock_reg
-
-        with pytest.raises(ForbiddenException):
-            await RegistrationService.request_proof_url(
-                db, REG_ID, {"sub": str(STUDENT_ID), "role": "student"}, "proof.pdf",
-            )
-
-    @pytest.mark.asyncio
-    async def test_request_proof_url_in_college(self):
-        from app.services.registration import RegistrationService
-
-        db = AsyncMock()
-        mock_reg = MagicMock()
-        mock_reg.student_id = STUDENT_ID
-        mock_reg.event_id = EVENT_ID
-        mock_reg.status = RegistrationStatus.ACCEPTED
-        mock_event = MagicMock()
-        mock_event.event_type = EventType.IN_COLLEGE
-        db.get.side_effect = [mock_reg, mock_event]
-
-        with pytest.raises(ConflictException, match="only for out-college"):
-            await RegistrationService.request_proof_url(
-                db, REG_ID, {"sub": str(STUDENT_ID), "role": "student"}, "proof.pdf",
-            )
-
-    @pytest.mark.asyncio
-    async def test_request_proof_url_not_accepted(self):
-        from app.services.registration import RegistrationService
-
-        db = AsyncMock()
-        mock_reg = MagicMock()
-        mock_reg.student_id = STUDENT_ID
-        mock_reg.event_id = EVENT_ID
-        mock_reg.status = RegistrationStatus.PENDING
-        mock_event = MagicMock()
-        mock_event.event_type = EventType.OUT_COLLEGE
-        db.get.side_effect = [mock_reg, mock_event]
-
-        with pytest.raises(ConflictException, match="must be accepted"):
-            await RegistrationService.request_proof_url(
-                db, REG_ID, {"sub": str(STUDENT_ID), "role": "student"}, "proof.pdf",
-            )
-
 
 @pytest.fixture
 def student_app():
@@ -522,35 +432,6 @@ class TestRegistrationsAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert data["data"]["status"] == "rejected"
-
-    @pytest.mark.asyncio
-    async def test_request_proof_upload(self, student_app):
-        with patch("app.services.registration.RegistrationService.request_proof_url", return_value={
-            "upload_url": "https://mock-s3.example.com/proofs/file.pdf",
-            "file_key": "proofs/file.pdf",
-            "expires_in": 300,
-        }):
-            transport = ASGITransport(app=student_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                resp = await client.post(
-                    f"/api/v1/registrations/{REG_ID}/proof",
-                    json={"file_name": "id-card.pdf", "file_type": "application/pdf"},
-                )
-
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["data"]["upload_url"] is not None
-
-    @pytest.mark.asyncio
-    async def test_proof_upload_validation_error(self, student_app):
-        transport = ASGITransport(app=student_app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post(
-                f"/api/v1/registrations/{REG_ID}/proof",
-                json={"file_name": "test.exe", "file_type": "application/x-msdownload"},
-            )
-
-        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_registration_not_found(self, teacher_app):

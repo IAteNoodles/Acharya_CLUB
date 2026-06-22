@@ -33,12 +33,8 @@ class RedisRateLimiter:
         now = time.time()
         window_start = now - window_seconds
 
-        pipe = self.redis.pipeline()
-        await pipe.zremrangebyscore(key, "-inf", window_start)
-        await pipe.zcard(key)
-        results = await pipe.execute()
-
-        count = results[1]
+        await self.redis.zremrangebyscore(key, "-inf", window_start)
+        count = await self.redis.zcard(key)
 
         if count >= max_requests:
             oldest = await self.redis.zrange(key, 0, 0, withscores=True)
@@ -58,13 +54,14 @@ async def get_rate_limiter(
     max_requests: int = 100,
     window_seconds: int = 60,
     redis_client: Optional[object] = None,
+    force_in_memory: bool = False,
 ):
     from app.core.redis import get_redis
 
-    if redis_client is None:
+    if not force_in_memory and redis_client is None:
         redis_client = await get_redis()
 
-    if redis_client is not None:
+    if redis_client is not None and not force_in_memory:
         limiter = RedisRateLimiter(redis_client)
     else:
         limiter = InMemoryRateLimiter()

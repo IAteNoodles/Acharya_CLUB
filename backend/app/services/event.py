@@ -28,6 +28,7 @@ class EventService:
             .options(
                 selectinload(Event.creator),
                 selectinload(Event.coordinator),
+                selectinload(Event.registrations),
             )
         )
 
@@ -103,6 +104,7 @@ class EventService:
             description=data.description,
             event_type=EventType(data.event_type),
             category=EventCategory(data.category),
+            venue=data.venue,
             status=status,
             start_date=data.start_date,
             end_date=data.end_date,
@@ -110,8 +112,12 @@ class EventService:
         )
         db.add(event)
         await db.commit()
-        await db.refresh(event)
-        return event
+        result = await db.execute(
+            select(Event)
+            .options(selectinload(Event.creator), selectinload(Event.coordinator))
+            .where(Event.id == event.id)
+        )
+        return result.scalar_one()
 
     @staticmethod
     async def get_event_by_id(
@@ -279,33 +285,4 @@ class EventService:
         await db.refresh(event)
         return event
 
-    @staticmethod
-    async def request_brochure_url(
-        db: AsyncSession,
-        event_id: str,
-        file_name: str,
-        file_type: str,
-        user: dict,
-    ) -> dict:
-        from uuid import uuid4
-        from app.core.exceptions import ForbiddenException, ValidationException
 
-        event = await EventService.get_event_by_id(db, event_id)
-
-        if event.event_type != EventType.OUT_COLLEGE:
-            raise ValidationException(
-                detail="Brochure upload is only available for out_college events",
-                errors=[{"loc": ["event_id"], "msg": "must be out_college"}],
-            )
-        user_id_str = user.get("sub")
-        if not user_id_str or uuid.UUID(user_id_str) != event.created_by:
-            raise ForbiddenException("Only the event creator can upload a brochure")
-
-        file_key = f"brochures/{uuid4()}-{file_name}"
-        upload_url = f"http://localhost:8000/mock-upload/{file_key}"
-
-        event.brochure_url = upload_url
-        event.brochure_file_key = file_key
-        await db.commit()
-
-        return {"upload_url": upload_url, "file_key": file_key}
