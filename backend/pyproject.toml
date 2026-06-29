@@ -4,7 +4,18 @@ version = "1.0.0"
 description = "Acharya_CLUB - College Event Management System Backend"
 requires-python = ">=3.12"
 dependencies = [
-    "sqlalchemy[asyncio]>=2.0.51",
+    "fastapi>=0.138.0,<0.139.0",
+    "uvicorn[standard]==0.34.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "pydantic-settings>=2.7.0",
+    "PyJWT[crypto]>=2.13.0",
+    "bcrypt>=4.2.0",
+    "redis[hiredis]>=5.2.1",
+    "structlog>=24.4.0",
+    "upstash-redis>=1.7.0",
+    "python-multipart>=0.0.19",
 ]
 
 [build-system]
@@ -25,8 +36,10 @@ addopts = "-m 'not e2e'"
 
 [dependency-groups]
 dev = [
-    "asyncpg>=0.31.0",
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.24.0",
     "httpx>=0.28.1",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=6.0.0",
+    "fakeredis[lua]>=2.0.0",
+    "testcontainers[postgres,redis]>=4.0.0",
 ]
