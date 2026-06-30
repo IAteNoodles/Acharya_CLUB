@@ -24,7 +24,7 @@ class AttendanceService:
     ) -> dict:
         event = await db.get(Event, event_id)
         if not event:
-            raise NotFoundException("Event not found")
+            raise NotFoundException(detail="Event not found")
 
         user_id = uuid.UUID(current_user["sub"])
         if current_user["role"] != "admin" and event.coordinator_id != user_id:
@@ -84,7 +84,7 @@ class AttendanceService:
     ) -> tuple[list[Attendance], int]:
         event = await db.get(Event, event_id)
         if not event:
-            raise NotFoundException("Event not found")
+            raise NotFoundException(detail="Event not found")
 
         user_id = uuid.UUID(current_user["sub"])
         if current_user["role"] != "admin" and event.coordinator_id != user_id:

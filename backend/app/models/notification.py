@@ -23,7 +23,7 @@ class Notification(TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     type: Mapped[NotificationType] = mapped_column(
-        SAEnum(NotificationType), nullable=False
+        SAEnum(NotificationType, values_callable=lambda obj: [e.value for e in obj]), nullable=False
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)

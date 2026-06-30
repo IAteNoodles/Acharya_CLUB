@@ -23,8 +23,8 @@ class User(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(180), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    role: Mapped[Role] = mapped_column(SAEnum(Role), default=Role.STUDENT, nullable=False)
-    status: Mapped[UserStatus] = mapped_column(SAEnum(UserStatus), default=UserStatus.PENDING, nullable=False)
+    role: Mapped[Role] = mapped_column(SAEnum(Role, values_callable=lambda obj: [e.value for e in obj]), default=Role.STUDENT, nullable=False)
+    status: Mapped[UserStatus] = mapped_column(SAEnum(UserStatus, values_callable=lambda obj: [e.value for e in obj]), default=UserStatus.PENDING, nullable=False)
 
     events_created: Mapped[List["Event"]] = relationship(
         back_populates="creator", foreign_keys="Event.created_by"

@@ -1,3 +1,5 @@
+import secrets
+import warnings
 from typing import List
 from urllib.parse import quote
 
@@ -21,8 +23,7 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # Database — components so password never lives in .env
-    # Set DB_PASSWORD via env var (not .env) in production
+    # Database — set DATABASE_URL or DB_PASSWORD in .env
     DATABASE_URL: str = ""
     DB_USER: str = "postgres.qwouxrnnwmkotkwraqme"
     DB_PASSWORD: str = ""
@@ -35,11 +36,14 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # JWT
-    JWT_SECRET: str
+    # JWT — auto-generated random secret in development if not provided
+    JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_EXPIRE_MINUTES: int = 15
     JWT_REFRESH_EXPIRE_DAYS: int = 7
+
+    # Security
+    BCRYPT_ROUNDS: int = 12
 
     # Middleware
     REQUEST_TIMEOUT_SECONDS: int = 30
@@ -68,14 +72,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def enforce_jwt_secret(self):
-        placeholder = "change-this-to-a-random-string-at-least-32-chars"
-        if self.JWT_SECRET == placeholder:
-            raise ValueError(
-                "JWT_SECRET is still set to the default placeholder. "
-                "Generate a secure random string: "
-                "python -c \"import secrets; print(secrets.token_urlsafe(48))\""
-            )
-        if len(self.JWT_SECRET) < 32:
+        if not self.JWT_SECRET or self.JWT_SECRET == "change-this-to-a-random-string-at-least-32-chars":
+            if self.ENVIRONMENT == "development":
+                self.JWT_SECRET = secrets.token_urlsafe(48)
+                warnings.warn(
+                    "JWT_SECRET not set — auto-generated a random development secret. "
+                    "Tokens will be invalidated on restart."
+                )
+            else:
+                raise ValueError(
+                    "JWT_SECRET must be set in production. Generate one with:\n"
+                    "  python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+                )
+        elif len(self.JWT_SECRET) < 32:
             raise ValueError(
                 f"JWT_SECRET must be at least 32 characters "
                 f"(got {len(self.JWT_SECRET)})"

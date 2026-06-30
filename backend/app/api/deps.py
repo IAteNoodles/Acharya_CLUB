@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.security import verify_token
-from app.services.auth import _blacklisted_tokens
+from app.services.auth import _is_blacklisted
 
 security_scheme = HTTPBearer(auto_error=False)
 
@@ -17,7 +17,7 @@ async def get_current_user(
         )
     token = credentials.credentials
 
-    if token in _blacklisted_tokens:
+    if await _is_blacklisted(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",

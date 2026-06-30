@@ -105,7 +105,7 @@ class NotificationService:
     ) -> Notification:
         notif = await db.get(Notification, notification_id)
         if not notif:
-            raise NotFoundException("Notification not found")
+            raise NotFoundException(detail="Notification not found")
         if notif.user_id != user_id:
             raise ForbiddenException("You do not own this notification")
         notif.is_read = True

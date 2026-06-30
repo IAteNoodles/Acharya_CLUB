@@ -15,7 +15,7 @@ Acharya_CLUB is a **College Event Management System** that digitizes the full li
 1. **Event Creation → Approval** — A Teacher or Admin creates an event with details (title, description, date, venue, category, max registrations, college-only flag). Events require Admin approval if flagged as Out-College. In-College events created by Teachers are auto-approved but can be flagged for review.
 2. **Registration → Confirmation** — Students browse published events and register. Registrations are capped at the event's maximum. Out-College events require additional fields (college name, ID card upload) and Admin confirmation.
 3. **Attendance Tracking** — On the event date, the Teacher coordinator marks attendance for registered students. Attendance records are stored per-event per-student with timestamps.
-4. **Notifications** — Email notifications are sent asynchronously for registration confirmations, event reminders, approval status changes, and attendance summaries.
+4. **Notifications** — In-app notifications are created synchronously when events are approved/rejected, registrations are accepted/rejected, and teacher accounts are approved/rejected. Notifications are stored in the database and retrieved via GET endpoints. No email notification system exists yet.
 
 ---
 
@@ -43,36 +43,43 @@ The module boundaries are designed so that **Events** and **Registrations** are 
 
 ### Module Map
 
-| Module | Responsibility | Tables |
-|---|---|---|
-| **Auth** | Signup, login, token issuance, token refresh, logout, email verification | `users` (partial), `refresh_tokens` |
-| **Users** | Profile CRUD, role management, student/teacher/admin data | `users`, `student_profiles` |
-| **Events** | Event CRUD, approval workflow, category management | `events`, `event_categories` |
-| **Registrations** | Student registration, waitlist, cancellation, confirmation | `registrations` |
-| **Attendance** | Marking attendance, attendance reports, bulk operations | `attendance_records` |
+| Module | Responsibility | Actual Tables | Evidence |
+|---|---|---|---|---|
+| **Auth** | Signup, login, token issuance, refresh, logout | `users` (partial: email, password_hash) | `app/services/auth.py` |
+| **Users** | Profile CRUD, role management, teacher approval/rejection | `users` | `app/services/user.py`, `app/api/v1/users.py` |
+| **Events** | Event CRUD, approval workflow, coordinator assignment | `events` | `app/models/event.py`, `app/services/event.py` |
+| **Registrations** | Student registration, accept/reject, capacity checks | `registrations` | `app/models/registration.py`, `app/services/registration.py` |
+| **Attendance** | Bulk mark, attendance queries, status tracking | `attendance` | `app/models/attendance.py`, `app/services/attendance.py` |
+| **Notifications** | In-app notification creation, listing, read status | `notifications` | `app/models/notification.py`, `app/services/notification.py` |
+| **Reports** | Dashboard aggregate statistics | (query across all tables) | `app/services/reports.py` |
+
+Actual table names use `__tablename__` (e.g., `events`, `registrations`, `attendance`, `notifications`, `users`). No `event_categories`, `student_profiles`, `refresh_tokens`, or `attendance_records` tables exist. Two Alembic migrations: `0001_initial_schema` (users, events, registrations, attendance) and `0002_notifications` (notifications).
 
 ---
 
 ## 3. Tech Stack
 
-| Technology | Version | Purpose | Rationale |
+| Technology | Version | Purpose | Evidence |
 |---|---|---|---|
-| **Python** | 3.12+ | Runtime | Modern type hints (PEP 695), improved asyncio, faster interpreter; excellent ecosystem for data-heavy and I/O-bound services |
-| **FastAPI** | 0.115+ | HTTP Framework | Async-native, auto-generates OpenAPI/Swagger docs, Pydantic v2 integration for request/response validation, dependency injection system eliminates boilerplate middleware |
-| **SQLAlchemy 2.0** | 2.0+ | ORM | Mature, async-native (async session + asyncpg), declarative mapping with Python type annotations, rich query API with relationship loading strategies |
-| **Alembic** | — | Migrations | Industry-standard migration tool for SQLAlchemy; autogenerate support, arbitrary migration directives, branching/merging |
-| **PostgreSQL** | 16 | Primary Database | ACID-compliant, advanced indexing (B-tree, GiST, GIN), JSONB for flexible fields, mature and reliable |
-| **Redis** | 7.x | Cache + Queue Backend | In-memory data store for sub-millisecond reads; also serves as the backing store for Celery result backend and rate limiting |
-| **redis-py** | 5.x | Redis Client | Official Python Redis client with async support (`aioredis` merged into redis-py 5+), connection pooling, clustering support |
-| **Pydantic v2** | 2.x | Validation | Rust-core engine (pydantic-core) for 5-50x faster validation; `BaseModel` with `model_validator`/`field_validator`; first-class FastAPI integration for request/response serialization |
-| **python-jose** | 3.x | JWT Implementation | Pure-Python JWT library with support for multiple algorithms (HS256, RS256, ES256); integrates cleanly with FastAPI dependency injection |
-| **passlib[bcrypt]** | — | Password Hashing | Industry-standard bcrypt implementation; OWASP-recommended cost factor of 12; passlib provides a unified hashing API with automatic salt management |
-| **boto3** | — | S3 Client | Official AWS SDK for Python; presigned URL generation, object upload/download, bucket policies |
-| **Celery** | — | Background Jobs | Distributed task queue with Redis broker; built-in retries, rate limiting, task routing, periodic tasks (celery beat), and Flower monitoring UI |
-| **structlog** | — | Logging | Structured logging with processor pipelines; bound loggers for request-scoped context (correlation IDs), JSON output via `structlog.processors.JSONRenderer` |
-| **pydantic-settings** | — | Configuration | `BaseSettings` with `.env` file loading, field validation, secret handling, `SettingsConfigDict` for flexible configuration management |
-| **httpx** | — | HTTP Client | Async HTTP client used in tests via `AsyncClient` to invoke the FastAPI app without a live server |
-| **FastAPI auto OpenAPI** | — | API Documentation | FastAPI automatically generates OpenAPI 3.1 spec from route definitions, Pydantic schemas, and docstrings; served at `/docs` (Swagger) and `/redoc` (ReDoc) with zero additional configuration |
+| **Python** | 3.12+ (CI: 3.12, Docker: 3.13) | Runtime | `pyproject.toml:5`, `.github/workflows/ci.yml:19`, `Dockerfile:2` |
+| **FastAPI** | >=0.138.0,<0.139.0 | HTTP Framework | Async-native, auto-generated OpenAPI docs, Pydantic v2 integration | `requirements.txt:2` |
+| **Uvicorn** | 0.34.0 | ASGI Server | `requirements.txt:3` |
+| **SQLAlchemy 2.0** | >=2.0.36 | Async ORM | `requirements.txt:4` |
+| **asyncpg** | >=0.30.0 | PostgreSQL async driver | `requirements.txt:5` |
+| **Alembic** | >=1.14.0 | DB Migrations | `requirements.txt:6` |
+| **PyJWT[crypto]** | >=2.13.0 | JWT auth (HS256) | `requirements.txt:8`, `app/core/security.py:4` |
+| **bcrypt** | >=4.2.0 | Password hashing | `requirements.txt:9`, `app/core/security.py:3` |
+| **redis-py** | >=5.2.1 | Redis client (rate limiting) | `requirements.txt:10`, `app/core/redis.py:4` |
+| **upstash-redis** | >=1.7.0 | REST-based Redis alternative | `requirements.txt:12`, `app/core/redis.py:8` |
+| **structlog** | >=24.4.0 | Structured JSON logging | `requirements.txt:11`, `app/core/logging_config.py` |
+| **pydantic-settings** | >=2.7.0 | Config from env/.env | `requirements.txt:7`, `app/core/config.py` |
+| **Pydantic v2** | 2.x | Request/response validation | `app/schemas/*.py` |
+| **PostgreSQL 16** (Supabase) | 16 | Primary database | `app/core/database.py`, `app/core/config.py:30` |
+| **Redis 7** | 7.x | Rate limiting (sliding window) | `app/middleware/rate_limit.py:26` |
+
+**Dev tooling:** pytest, pytest-asyncio, httpx, pytest-cov, fakeredis, testcontainers, psycopg2-binary.
+
+**Not present in codebase (aspirational/planned):** Celery, boto3/S3, python-jose, passlib, SMTP/email service, Prometheus, audit_logs table, file upload endpoints. These are planned but not yet implemented.
 
 ---
 
@@ -82,175 +89,262 @@ The module boundaries are designed so that **Events** and **Registrations** are 
 backend/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py                       # FastAPI app creation, lifespan, CORS middleware, exception handlers
+│   ├── main.py                       # FastAPI app factory (create_app), lifespan, middleware, router registration
 │   │
 │   ├── core/
 │   │   ├── __init__.py
-│   │   ├── config.py                 # pydantic-settings BaseSettings (validated at import time)
-│   │   ├── database.py               # async engine, async_sessionmaker, get_db dependency generator
-│   │   ├── redis.py                  # Redis async client singleton
-│   │   ├── security.py               # JWT create/verify (python-jose), password hash/verify (passlib)
-│   │   └── exceptions.py             # Custom AppHTTPException subclasses
+│   │   ├── config.py                 # pydantic-settings BaseSettings (DATABASE_URL auto-built from components)
+│   │   ├── database.py               # async engine (NullPool in CI), async_sessionmaker, get_db generator
+│   │   ├── redis.py                  # Redis async client singleton + Upstash REST fallback
+│   │   ├── security.py               # JWT create/verify (PyJWT), password hash/verify (bcrypt)
+│   │   ├── exceptions.py             # AppHTTPException hierarchy + register_exception_handlers
+│   │   └── logging_config.py         # structlog JSON logger setup
 │   │
 │   ├── api/
 │   │   ├── __init__.py
-│   │   ├── deps.py                   # FastAPI dependencies: get_current_user, get_current_admin_user, etc.
+│   │   ├── deps.py                   # get_current_user, require_admin, require_teacher_or_admin, require_student
 │   │   └── v1/
 │   │       ├── __init__.py
-│   │       ├── router.py             # Aggregates all v1 routers via app.include_router
-│   │       ├── auth.py               # POST /signup, /login, /refresh, /logout, /verify-email
-│   │       ├── users.py              # GET/PATCH /users/me, GET /users (admin), PATCH /users/{id}/role
-│   │       ├── events.py             # CRUD /events, POST /events/{id}/approve, POST /events/{id}/reject
-│   │       ├── registrations.py      # POST /events/{id}/register, DELETE /registrations/{id}
-│   │       └── attendance.py         # POST /attendance/bulk, GET /attendance/sheet
+│   │       ├── auth.py               # POST /signup, /login, /refresh, /logout
+│   │       ├── users.py              # GET /users/me, PATCH /users/me, GET /users, PATCH /users/{id}/status
+│   │       ├── events.py             # CRUD /events, POST /events/{id}/approve|reject|assign-coordinator
+│   │       ├── registrations.py      # POST /, GET /my, GET /event/{id}, PATCH /{id}/accept|reject
+│   │       ├── attendance.py         # POST /bulk, GET /event/{id}, GET /my
+│   │       ├── notifications.py      # GET /, PATCH /{id}/read, POST /read-all
+│   │       ├── reports.py            # GET /dashboard
+│   │       ├── health.py             # GET /health (unauthenticated, unrate-limited)
 │   │
-│   ├── models/                       # SQLAlchemy 2.0 declarative models
+│   ├── middleware/
 │   │   ├── __init__.py
-│   │   ├── base.py                   # DeclarativeBase with common columns (id, created_at, updated_at)
-│   │   ├── user.py                   # User model
-│   │   ├── event.py                  # Event model
-│   │   ├── registration.py           # Registration model
-│   │   └── attendance.py             # AttendanceRecord model
+│   │   ├── rate_limit.py             # RedisRateLimiter + InMemoryRateLimiter fallback (strategy pattern)
+│   │   ├── security.py               # SecurityHeadersMiddleware (CSP, HSTS, X-Frame-Options, etc.)
+│   │   └── timeout.py                # RequestTimeoutMiddleware (default 30s)
+│   │
+│   ├── models/                       # SQLAlchemy 2.0 declarative models (all SAEnum with values_callable)
+│   │   ├── __init__.py
+│   │   ├── base.py                   # DeclarativeBase + TimestampMixin (UUID pk, created_at, updated_at)
+│   │   ├── user.py                   # User (Role, UserStatus enums)
+│   │   ├── event.py                  # Event (EventType, EventStatus, EventCategory enums)
+│   │   ├── registration.py           # Registration (RegistrationStatus enum)
+│   │   ├── attendance.py             # Attendance (AttendanceStatus enum)
+│   │   └── notification.py           # Notification (NotificationType enum)
 │   │
 │   ├── schemas/                      # Pydantic v2 schemas (request/response)
 │   │   ├── __init__.py
-│   │   ├── auth.py                   # SignupRequest, LoginRequest, TokenResponse, RefreshRequest
-│   │   ├── user.py                   # UserResponse, UserUpdate, AssignRoleRequest
-│   │   ├── event.py                  # EventCreate, EventResponse, EventUpdate, EventQueryParams
-│   │   ├── registration.py           # RegistrationResponse, RegisterRequest
-│   │   └── attendance.py             # BulkAttendanceRequest, AttendanceRecordResponse
+│   │   ├── auth.py
+│   │   ├── users.py
+│   │   ├── event.py
+│   │   ├── registration.py
+│   │   ├── attendance.py
+│   │   ├── notification.py
+│   │   ├── reports.py
+│   │   └── common.py                 # PaginationParams, ErrorResponse, SuccessResponse
 │   │
-│   └── services/                     # Business logic layer
+│   └── services/                     # Business logic layer (services use AsyncSession directly, no repo pattern)
 │       ├── __init__.py
-│       ├── auth.py                   # signup, login, refresh_tokens, logout, verify_email
-│       ├── user.py                   # get_profile, update_profile, assign_role, list_users
-│       ├── event.py                  # create_event, list_events, approve_event, reject_event
-│       ├── registration.py           # register_student, cancel_registration, capacity_check
-│       └── attendance.py             # mark_attendance_bulk, get_attendance_sheet, get_my_attendance
+│       ├── auth.py                   # signup, login, refresh, logout, get_me (in-memory _blacklisted_tokens set)
+│       ├── user.py                   # profile CRUD, role management
+│       ├── event.py                  # event CRUD, approval workflow, coordinator assignment
+│       ├── registration.py           # registration, capacity checks, accept/reject
+│       ├── attendance.py             # bulk mark attendance, attendance queries
+│       ├── notification.py           # create, list, mark_read, mark_all_read
+│       └── reports.py                # dashboard aggregate stats (8 sequential DB queries)
 │
 ├── alembic/                          # Alembic migrations
-│   ├── versions/                     # Auto-generated migration scripts
+│   ├── versions/
+│   │   ├── 0001_initial_schema.py    # Users, events, registrations, attendance tables
+│   │   └── 0002_notifications.py     # Notifications table
 │   ├── env.py                        # Alembic environment config (async run_async)
-│   └── alembic.ini                   # Alembic configuration (sqlalchemy.url reference)
+│   └── alembic.ini
 │
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py                   # Fixtures: async test client, test database, auth headers
-│   ├── test_auth.py
+│   ├── conftest.py                   # app fixture → create_app()
+│   ├── test_auth.py, test_auth_schemas.py, test_auth_service.py
 │   ├── test_users.py
 │   ├── test_events.py
 │   ├── test_registrations.py
-│   └── test_attendance.py
+│   ├── test_attendance.py
+│   ├── test_notifications.py, test_notification_schemas.py
+│   ├── test_reports.py, test_reports_schemas.py
+│   ├── test_common_schemas.py
+│   ├── test_config.py, test_database.py, test_deps.py, test_exceptions.py
+│   ├── test_health.py, test_logging_config.py, test_main.py
+│   ├── test_rate_limit.py, test_redis.py, test_security.py, test_timeout.py
+│   ├── test_e2e_workflows.py         # 6 E2E tests (testcontainers, marked @pytest.mark.e2e)
+│   └── real_db/                      # Integration tests against real Supabase
+│       ├── conftest.py               # Direct async engine from settings.DATABASE_URL (no testcontainers)
+│       └── test_auth.py, test_users.py, test_events.py, test_registrations.py,
+│           test_attendance.py, test_notifications.py, test_reports.py
 │
 ├── scripts/
-│   ├── seed.py                       # Database seed script: creates admin user, sample events, categories
-│   └── seed_data.py                  # Raw seed data constants (event titles, dummy student list)
+│   ├── entrypoint.sh                 # Docker entrypoint: alembic upgrade head → uvicorn
+│   └── seed.py                       # Database seed script
 │
-├── pyproject.toml                    # Build config, dependencies, tool settings (ruff, pytest)
-├── requirements.txt                  # Pinned dependencies for reproducible builds
-├── Dockerfile                        # Multi-stage build: deps → install → production image
-├── docker-compose.yml                # Services: app (uvicorn hot-reload), postgres:16, redis:7
-└── .env.example                      # Documented env template with all variables
+├── .env.example                      # Supabase-first env template
+├── pyproject.toml                    # Build config, dependencies, pytest markers
+├── requirements.txt                  # Pinned dependencies (including dev: fakeredis, testcontainers, psycopg2-binary)
+├── Dockerfile                        # Multi-stage Dockerfile (python:3.13-alpine)
+├── docker-compose.yml                # Services: app (reads .env), postgres:16 (profile:local-db), redis:7 (profile:local-db)
+├── docker-compose.prod.yml           # Production Docker Compose
+├── uv.lock                           # UV lockfile for reproducible installs
+└── README.md                         # Setup guide, API reference, testing instructions
 ```
 
 ---
 
 ## 5. Data Flow Diagrams
 
-### 5.1 Authentication Flow
+### 5.1 High-Level Request Lifecycle
+
+Every authenticated API request follows this path through the system layers:
 
 ```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Client  │     │   API    │     │   DB     │     │   Redis   │
-└────┬─────┘     └────┬─────┘     └────┬─────┘     └────┬──────┘
-     │                 │                │                │
-     │  POST /signup   │                │                │
-     │ {email,pass,...}│                │                │
-     ├────────────────►│                │                │
-     │                 │ Pydantic val.  │                │
-     │                 │ passlib hash   │                │
-     │                 │ Create user    │                │
-     │                 ├───────────────►│                │
-     │                 │                │                │
-     │                 │ Enqueue email  │                │
-     │                 │ (verify mail)  │                │
-     │  {success:true} │                │                │
-     │◄────────────────┤                │                │
-     │                 │                │                │
-     │  POST /login    │                │                │
-     │ {email,password}│                │                │
-     ├────────────────►│                │                │
-     │                 │ Pydantic val.  │                │
-     │                 │ Fetch user     │                │
-     │                 ├───────────────►│                │
-     │                 │◄───────────────┤                │
-     │                 │ passlib verify │                │
-     │                 │ Sign tokens:   │                │
-     │                 │ access(15min)  │                │
-     │                 │ refresh(7d)    │                │
-     │                 │ Store refresh  │                │
-     │                 │ token hash     │                │
-     │                 ├───────────────►│                │
-     │ {accessToken,   │                │                │
-     │  refreshToken,  │                │                │
-     │  user}          │                │                │
-     │◄────────────────┤                │                │
-     │                 │                │                │
-     │  GET /protected │                │                │
-     │ Auth: Bearer    │                │                │
-     ├────────────────►│                │                │
-     │                 │ python-jose    │                │
-     │                 │ verify JWT sig │                │
-     │                 │ Check blacklist│                │
-     │                 ├───────────────►│ exists?        │
-     │                 │◄───────────────│ no             │
-     │                 │ Depends()      │                │
-     │                 │ injects user   │                │
-     │                 │ Route handler  │                │
-     │  {data}         │                │                │
-     │◄────────────────┤                │                │
-     │                 │                │                │
+┌────────────────────────────────────────────────────────────────────────┐
+│                          CLIENT (Mobile / Web)                         │
+│              POST /api/v1/events  │  GET /api/v1/registrations/my      │
+└────────────────────────┬───────────────────────────────────────────────┘
+                         │ HTTP request (Bearer JWT)
+                         ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                   MIDDLEWARE STACK (in order)                    │  │
+│  │                                                                  │  │
+│  │  1. CORSMiddleware           — CORS headers from whitelist       │  │
+│  │  2. SecurityHeadersMiddleware — CSP, HSTS, X-Frame-Options       │  │
+│  │  3. RequestTimeoutMiddleware  — 30s timeout per request          │  │
+│  │  4. RateLimitMiddleware      — Sliding-window (Redis/in-memory)  │  │
+│  │  5. RequestIDMiddleware      — UUID v4 per request + logging     │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└────────────────────────┬───────────────────────────────────────────────┘
+                         ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                    FASTAPI ROUTER LAYER                          │  │
+│  │                                                                  │  │
+│  │  1. Route matching (/api/v1/registrations → registrations router)│  │
+│  │  2. Path/query parameter extraction + Pydantic validation        │  │
+│  │  3. Request body parsing + Pydantic schema validation (→ 422)    │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└────────────────────────┬───────────────────────────────────────────────┘
+                         ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                DEPENDENCY INJECTION LAYER                             │
+│                                                                       │
+│  ┌──────────────────────┐    ┌────────────────────────────────────┐   │
+│  │  get_current_user    │    │  get_db                           │   │
+│  │  ┌──────────────┐    │    │  ┌─────────────────────────────┐  │   │
+│  │  │ HTTPBearer   │    │    │  │ async_sessionmaker()        │  │   │
+│  │  │ (parse token)│    │    │  │ → AsyncSession (scoped)     │  │   │
+│  │  │ verify_token │    │    │  │ → yield session             │  │   │
+│  │  │ is_blacklisted│   │    │  │ → close on response         │  │   │
+│  │  │ → payload    │    │    │  └─────────────────────────────┘  │   │
+│  │  └──────────────┘    │    └────────────────────────────────────┘   │
+│  │  require_admin       │                                             │
+│  │  require_student     │       ┌────────────────────────────────┐   │
+│  │  require_teacher_or  │       │  get_redis()                   │   │
+│  │    _admin            │       │  → redis.Redis client / None   │   │
+│  └──────────────────────┘       └────────────────────────────────┘   │
+└────────────────────────┬───────────────────────────────────────────────┘
+                         ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                    SERVICE LAYER (Business Logic)                      │
+│                                                                       │
+│  RegistrationService.register(db, event_id, role_type, user)          │
+│                                                                       │
+│  1. db.get(Event, event_id)              → validate event exists     │
+│  2. Check event.status == "approved"     → raise ConflictException   │
+│  3. Check event.coordinator_id           → raise ConflictException   │
+│  4. Check max_registrations capacity     → raise ConflictException   │
+│  5. Check duplicate registration         → raise ConflictException   │
+│  6. Registration(...) → db.add()         → INSERT                    │
+│  7. db.commit() / db.refresh()           → persist + reload          │
+│  8. Return Registration model                                       │
+└────────────────────────┬───────────────────────────────────────────────┘
+                         ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                  PERSISTENCE & EXTERNAL SERVICES                       │
+│                                                                       │
+│  ┌──────────────────────┐     ┌─────────────────────────────────┐     │
+│  │     PostgreSQL 16    │     │          Redis 7                │     │
+│  │     (Supabase)       │     │                                 │     │
+│  │                      │     │  • Rate-limit counters          │     │
+│  │  • users table       │     │    (sliding window sorted set)  │     │
+│  │  • events table      │     │  • JWT blacklist               │     │
+│  │  • registrations tbl │     │    (SETEX with TTL)             │     │
+│  │  • attendance table  │     │                                 │     │
+│  │  • notifications tbl │     │                                 │     │
+│  └──────────────────────┘     └─────────────────────────────────┘     │
+└────────────────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                         RESPONSE                                      │
+│                                                                       │
+│  HTTP 200/201:  { "success": true, "data": { ... } }                 │
+│  HTTP 4xx:      { "success": false, "error": { "code": ...,          │
+│                   "message": ..., "details": [...] } }                │
+│                                                                       │
+│  Headers: X-Request-ID, X-RateLimit-Remaining, Content-Type          │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 File Upload Flow (Presigned S3 URLs)
+### 5.2 Authentication Flow
 
 ```
-┌──────────┐          ┌──────────┐         ┌──────────┐
-│  Client  │          │   API    │         │    S3    │
-└────┬─────┘          └────┬─────┘         └────┬─────┘
-     │                      │                    │
-     │  POST /upload/presigned-url               │
-     │  {fileName, fileType} │                    │
-     ├─────────────────────►│                    │
-     │                      │ Pydantic validate  │
-     │                      │ Check file type    │
-     │                      │ allowed?            │
-     │                      │ Generate presigned  │
-     │                      │ PUT URL (5min expiry│
-     │                      │ Key: uploads/       │
-     │                      │  {userId}/{uuid}.ext │
-     │                      ├───────────────────►│
-     │                      │◄───────────────────│
-     │  {uploadUrl,         │                    │
-     │   objectKey}         │                    │
-     │◄─────────────────────┤                    │
-     │                      │                    │
-     │  PUT {file}          │                    │
-     │  (direct to S3)      │                    │
-     ├─────────────────────────────────────────►│
-     │                      │                    │
-     │  POST /upload/confirm│                    │
-     │  {objectKey}         │                    │
-     ├─────────────────────►│                    │
-     │                      │ Verify object      │
-     │                      │ exists in S3       │
-     │                      │ Save URL to DB     │
-     │  {fileUrl}           │                    │
-     │◄─────────────────────┤                    │
-     │                      │                    │
+┌──────────┐     ┌──────────┐     ┌──────────┐
+│  Client  │     │   API    │     │    DB    │
+└────┬─────┘     └────┬─────┘     └────┬─────┘
+     │                 │                │
+     │  POST /signup   │                │
+     │ {name,email,    │                │
+     │  password,role} │                │
+     ├────────────────►│                │
+     │                 │ Pydantic val.  │
+     │                 │ bcrypt hash    │
+     │                 │ Create user    │
+     │                 ├───────────────►│
+     │  {user,         │                │
+     │   accessToken,  │                │
+     │   refreshToken} │                │
+     │◄────────────────┤                │
+     │                 │                │
+     │  POST /login    │                │
+     │ {email,password}│                │
+     ├────────────────►│                │
+     │                 │ Pydantic val.  │
+     │                 │ Fetch user     │
+     │                 ├───────────────►│
+     │                 │◄───────────────│
+     │                 │ bcrypt verify  │
+     │                 │ Sign tokens:   │
+     │                 │ access(15min)  │
+     │                 │ refresh(7d)    │
+     │  {accessToken,  │                │
+     │   refreshToken, │                │
+     │   user}         │                │
+     │◄────────────────┤                │
+     │                 │                │
+     │  GET /protected │                │
+     │ Auth: Bearer    │                │
+     ├────────────────►│                │
+     │                 │ PyJWT verify   │
+     │                 │ HS256 sig      │
+│                 │ Check Redis    │
+│                 │ blacklist      │
+     │                 │ Depends()      │
+     │                 │ injects user   │
+     │                 │ Route handler  │
+     │  {data}         │                │
+     │◄────────────────┤                │
+     │                 │                │
 ```
 
-### 5.3 Attendance Marking Flow
+### 5.3 [PLANNED] File Upload Flow (Presigned S3 URLs)
+
+Not yet implemented. No file upload endpoints, S3 client, or ClamAV scanning exist in the current codebase.
+
+### 5.4 Attendance Marking Flow
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐
@@ -289,45 +383,11 @@ backend/
      │                 │                │
 ```
 
-### 5.4 Email Notification Flow (Async with Celery)
+### 5.5 Notification Flow (In-App, Synchronous)
 
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│  Client  │    │   API    │    │  Redis   │    │  Worker  │    │   SMTP   │
-└────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘
-     │                │               │               │               │
-     │  POST /register│               │               │               │
-     │  event         │               │               │               │
-     ├───────────────►│               │               │               │
-     │                │ Save reg to DB│               │               │
-     │                │ Enqueue email │               │               │
-     │                │ task:         │               │               │
-     │                │ {type:        │               │               │
-     │                │ "registration"│               │               │
-     │                │  confirmation"│               │               │
-     │                ├──────────────►│               │               │
-     │  {success}     │               │               │               │
-     │◄───────────────┤               │               │               │
-     │                │               │               │               │
-     │                │               │ Worker picks  │               │
-     │                │               │ up task       │               │
-     │                │               ├──────────────►│               │
-     │                │               │               │ Compose email │
-     │                │               │               │ (Jinja2       │
-     │                │               │               │ template +    │
-     │                │               │               │ user data)    │
-     │                │               │               ├──────────────►│
-     │                │               │               │               │
-     │                │               │               │◄──────────────│
-     │                │               │               │ Mark task done│
-     │                │               │◄──────────────│               │
-     │                │               │               │               │
-     │                │               │ On failure:   │               │
-     │                │               │ retry with    │               │
-     │                │               │ exponential   │               │
-     │                │               │ backoff       │               │
-     │                │               │ (max 3 retries)               │
-```
+Notifications are created synchronously within the same request as the triggering action (event approve/reject, registration accept/reject, teacher approve/reject). They are stored in the `notifications` table and retrieved via GET endpoints. No email/Celery async flow is implemented.
+
+[PLANNED: Email notifications via Celery or Cloudflare Email Workers]
 
 ---
 
@@ -335,29 +395,25 @@ backend/
 
 ### 6.1 Authentication & Token Management
 
-- **JWT with HS256** (symmetric key from env `JWT_SECRET`). Access tokens expire in **15 minutes**. Refresh tokens expire in **7 days**.
-- **Refresh token rotation**: Every time a refresh token is used, the old token is invalidated and a new one issued. If a rotated-out token is ever reused, all refresh tokens for that user are revoked (breach detection).
-- **Token blacklist**: On logout, the access token's `jti` is added to Redis with a TTL matching its remaining validity. Every authenticated request checks the blacklist before accepting the token (via FastAPI `Depends(get_current_user)`).
-- **Email verification**: New accounts start with `email_verified: False`. A signed email verification link (JWT, 24h expiry) is sent on signup. Protected routes for students check `email_verified` and return 403 if unverified.
+- **JWT with HS256** (symmetric key from env `JWT_SECRET`). Access tokens expire in **15 minutes**. Refresh tokens expire in **7 days**. JWT_SECRET is auto-generated in development if not provided.
+- **Refresh token rotation**: Every time a refresh token is used, the old token is added to an in-memory blacklist (`_blacklisted_tokens` set) and a new one issued. If a rotated-out token is ever reused, it is rejected.
+- **Token blacklist**: An in-memory `set()` at `app/services/auth.py:16` holds revoked refresh tokens. Blacklist is **not persisted** — reset on each restart. Not shared across uvicorn workers.
+- **Email verification**: [PLANNED — Not yet implemented. No email sending capability exists.]
 
 ### 6.2 Role-Based Access Control (RBAC)
 
-```
-Roles (hierarchical):
-  admin > teacher > student
+Actual dependencies in `app/api/deps.py`:
+- `get_current_user` — verifies JWT, checks in-memory blacklist, returns payload dict
+- `require_admin` — checks `current_user.get("role") == "admin"`
+- `require_teacher_or_admin` — checks `role in ("teacher", "admin")`
+- `require_student` — checks `role == "student"`
 
-FastAPI dependency usage:
-  Depends(get_current_user)              // verifies JWT, injects User model
-  Depends(require_role('teacher'))       // current_user.role >= 'teacher' (admin also passes)
-  Depends(require_role('admin'))         // current_user.role == 'admin'
-```
-
-The `require_role` dependency factory accepts a minimum role argument. A dictionary `ROLE_HIERARCHY` maps numeric levels (admin=3, teacher=2, student=1) for comparison. This avoids hard-coded role checks scattered across route handlers.
+No `require_role` factory or `ROLE_HIERARCHY` dict exists. The checks are explicit string comparisons per dependency function.
 
 ### 6.3 Input Validation
 
 - Every endpoint uses a **Pydantic v2 schema** that validates request body, query parameters, and path parameters via FastAPI's built-in validation.
-- FastAPI automatically returns a 422 response with field-level error details if validation fails — no manual validation middleware needed.
+- FastAPI automatically returns a 422 response with field-level error details if validation fails.
 - `model_validator` and `field_validator` decorators enable complex cross-field validation (e.g., end_date > start_date).
 - This prevents malformed or malicious input from reaching business logic or the database.
 
@@ -365,11 +421,10 @@ The `require_role` dependency factory accepts a minimum role argument. A diction
 
 | Scope | Limit | Backend |
 |---|---|---|
-| Authentication (login, signup) | 10 attempts per 15 minutes per IP | Redis sliding window |
-| General API | 100 requests per minute per IP | Redis sliding window |
-| Attendance marking | 30 requests per minute per user | Redis sliding window |
+| General API | 100 requests per minute per IP | Redis sliding window (or in-memory fallback) |
+| Authentication (login, signup) | 20 requests per minute per IP | Redis sliding window (or in-memory fallback) |
 
-Rate limit headers are returned: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
+Rate limiter uses a strategy pattern (`app/middleware/rate_limit.py`): `RedisRateLimiter` when Redis is configured, `InMemoryRateLimiter` (per-process dict) as fallback. In-memory fallback is NOT accurate under multi-worker deployments.
 
 ### 6.5 HTTP Security Headers
 
@@ -387,51 +442,43 @@ CORS is configured via FastAPI's `CORSMiddleware` with an explicit whitelist rea
 
 ### 6.7 File Upload Security
 
-- **File type validation**: Whitelist approach — only specific MIME types are allowed (image/jpeg, image/png, image/webp, application/pdf). Files are validated both by extension and by magic bytes using `python-magic` library.
-- **File size limit**: 5MB per file (configurable via `MAX_FILE_SIZE` env).
-- **Malware scanning**: Uploaded files are scanned via ClamAV (containerized) before the confirm endpoint accepts the upload. Infected files are deleted from S3.
-- **Presigned URL expiry**: Upload URLs expire in 5 minutes, limiting the window for abuse.
+[PLANNED — Not yet implemented. No file upload endpoints exist.]
 
 ### 6.8 Password Hashing
 
-**passlib[bcrypt]** is used with the following parameters:
+**bcrypt** (direct, not passlib) is used with the following parameters:
 
 | Parameter | Value |
 |---|---|
-| Algorithm | bcrypt (via passlib) |
-| Rounds (cost factor) | 12 |
-| Salt | Auto-generated 16-byte salt |
+| Algorithm | bcrypt (via `bcrypt.gensalt()` — default rounds) |
+| Rounds (cost factor) | Default (12) |
+| Salt | Auto-generated |
 
-bcrypt is the industry standard for password hashing. A cost factor of 12 ensures hashing takes ~250ms on modern hardware, balancing security with user experience. passlib's `CryptContext` provides automatic algorithm migration support if a stronger algorithm is adopted later.
+Implemented in `app/core/security.py:52-57`. Cost factor is not configurable via env var.
 
 ### 6.9 SQL Injection Prevention
 
-All database queries go through **SQLAlchemy 2.0** which uses parameterized queries under the hood. Raw SQL via `text()` is banned — the linter (ruff) enforces this rule.
+All database queries go through **SQLAlchemy 2.0** which uses parameterized queries under the hood. Raw SQL via `text()` is not prevented by an active linter — no ruff/flake8 enforcement is configured.
 
 ### 6.10 Audit Logging
 
-All state-mutating operations (create, update, delete, approve, reject) are logged to an `audit_logs` table with: `actor_id`, `action`, `resource_type`, `resource_id`, `old_value` (JSONB), `new_value` (JSONB), `ip_address`, `user_agent`, and `timestamp`. Logs are append-only and immutable.
+[PLANNED — Not yet implemented. No `audit_logs` table exists.]
 
 ---
 
 ## 7. Caching Strategy
 
-| What | Pattern | TTL | Invalidation Trigger | Rationale |
-|---|---|---|---|---|
-| Event listings (paginated, filtered) | Cache-aside | 5 minutes | Event created, approved, rejected, updated | Event list is the most frequently read endpoint. 5min TTL balances freshness with cache hit ratio. |
-| Single event details | Cache-aside | 5 minutes | Event updated, approved, rejected | Same as listings — read-heavy, low write frequency. |
-| User profile (non-sensitive) | Cache-aside | 15 minutes | User updates profile | Profiles change infrequently. Longer TTL is acceptable. |
-| Attendance sheet (single event/date) | Cache-aside | 2 minutes | Attendance marked | Attendance is marked live during the event. 2min ensures teachers see recent changes without DB load. |
-| Rate limit counters | Direct Redis | 15 minutes | Auto-expiry (sliding window) | Rate limit counts are ephemeral and need no explicit invalidation. |
-| Token blacklist | Direct Redis | Until token's `exp` claim | On logout | Blacklist entries must live exactly as long as the token itself. |
-| Dashboard stats (admin) | Cache-aside | 10 minutes | Event mutation, registration mutation | Aggregated stats are expensive to compute. Periodic refresh is acceptable. |
-| Refresh token hashes | Direct Redis | 7 days | On token rotation or logout | Stored in Redis for fast lookup on refresh; TTL matches token lifetime. |
+[PLANNED — No cache-aside pattern is currently implemented in any service layer. All queries go directly to the database.]
 
-**Cache-aside (lazy loading) pattern:**
-1. Check cache for key `events:list:{hash(query)}`
-2. On hit: return cached data
-3. On miss: query DB, store in cache, return data
-4. On write: delete corresponding cache keys (not update — let next read populate)
+Current state:
+- **Rate limit counters**: Use Redis sorted sets (or in-memory dict fallback). This is the only cached data in the system.
+- **Token blacklist**: In-memory Python `set()`, not Redis.
+- **All other data**: Direct SQLAlchemy queries on every request.
+
+Planned caching (not implemented):
+- Event listings: Cache-aside with 5min TTL
+- User profiles: Cache-aside with 15min TTL
+- Dashboard stats: Cache-aside with 10min TTL
 
 ---
 
@@ -439,85 +486,43 @@ All state-mutating operations (create, update, delete, approve, reject) are logg
 
 ### 8.1 Consistent Response Format
 
-Every API response follows this structure:
+Error responses follow this structure (from `app/core/exceptions.py`):
 
 ```python
-# Success
 {
-    "success": true,
-    "data": { ... }           # The response payload
-}
-
-# Error
-{
-    "success": false,
+    "success": False,
     "error": {
-        "code": "VALIDATION_ERROR",
-        "message": "Invalid request data",
-        "details": [          # Optional; present for validation errors
-            {"field": "email", "message": "Invalid email format"}
-        ]
+        "code": "VALIDATION_ERROR",     # Machine-readable error code
+        "message": "Validation failed",  # Human-readable detail
+        "details": [...]                 # Optional; present for ValidationException
     }
 }
 ```
 
+Success responses do not follow a standardized envelope — data shape depends on the endpoint.
+
 ### 8.2 Exception Class Hierarchy
 
 ```
-AppHTTPException (base, extends HTTPException)
-├── NotFoundException       → 404 — Resource not found
-├── UnauthorizedException   → 401 — Missing or invalid authentication
-├── ForbiddenException      → 403 — Authenticated but not permitted
-├── ValidationException     → 400 — Pydantic validation failure (includes field details)
-└── ConflictException       → 409 — Duplicate or state conflict (e.g., already registered)
+AppHTTPException (base, extends Exception — NOT HTTPException)
+├── NotFoundException       → 404 — error_code="NOT_FOUND"
+├── UnauthorizedException   → 401 — error_code="UNAUTHORIZED" (+ WWW-Authenticate header)
+├── ForbiddenException      → 403 — error_code="FORBIDDEN"
+├── ValidationException     → 422 — error_code="VALIDATION_ERROR" (+ errors list)
+└── ConflictException       → 409 — error_code="CONFLICT"
 ```
 
-Each exception class accepts a `message` string and optional `details` payload. The `AppHTTPException` base class stores a `status_code` and a machine-readable `code` string (e.g., `"VALIDATION_ERROR"`).
+Each accepts `detail` (str) and optional `error_code` (str). `ValidationException` additionally accepts an `errors` (list of dicts) for field-level details.
 
 ### 8.3 Exception Handlers
 
-FastAPI exception handlers are registered in `main.py` to catch all errors:
+Registered via `register_exception_handlers(app)` in `app/core/exceptions.py:73`. Three handlers:
 
-1. If the exception is an instance of `AppHTTPException`, use its `status_code` and `code`.
-2. If the exception is a `RequestValidationError` (FastAPI's built-in Pydantic validation error), return a `ValidationException` with field-level details.
-3. If the exception is from SQLAlchemy (e.g., `IntegrityError`), map known error codes (unique constraint → ConflictException, foreign key → NotFoundException).
-4. For unknown errors, log the full stack trace via structlog but return a generic `500 Internal Server Error` without exposing internals.
-5. In **development** mode only, attach the stack trace to the response for debugging.
+1. **AppHTTPException** — Returns JSON with `status_code`, `error_code`, `detail`. For `ValidationException`, also serializes `errors`.
+2. **StarletteHTTPException** — Catches FastAPI/Starlette HTTP errors (e.g., 405, 404 from router). Maps 404→`"NOT_FOUND"`, others→`"HTTP_ERROR"`.
+3. **Generic Exception** — All unhandled exceptions return `500` with `"INTERNAL_ERROR"` code. No stack trace exposed to client.
 
-```python
-@app.exception_handler(AppHTTPException)
-async def app_http_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "success": False,
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-                "details": exc.details
-            }
-        }
-    )
-```
-
-### 8.4 Unhandled Exceptions & Graceful Shutdown
-
-```python
-import asyncio
-import signal
-
-async def shutdown(sig, loop):
-    logger.info("Received signal %s, shutting down gracefully", sig.name)
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    for task in tasks:
-        task.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
-    loop.stop()
-
-loop = asyncio.get_event_loop()
-for sig in (signal.SIGTERM, signal.SIGINT):
-    loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown(s, loop)))
-```
+No RequestValidationError or SQLAlchemy-specific handlers are registered. No development-mode stack trace exposure.
 
 ---
 
@@ -525,209 +530,155 @@ for sig in (signal.SIGTERM, signal.SIGINT):
 
 ### 9.1 Structured Logging with structlog
 
-All logs are output as newline-delimited JSON. In development, logs are pretty-printed via `structlog.dev.ConsoleRenderer`. In production, they are ingested by a log aggregation system (e.g., ELK, Grafana Loki).
+All logs are output as newline-delimited JSON (via `JSONRenderer`). No pretty-printing or dev console renderer configured.
+
+Actual config from `app/core/logging_config.py`:
 
 ```python
 structlog.configure(
     processors=[
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
+        add_log_level,
+        TimeStamper(fmt="iso"),
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer(),
+        JSONRenderer(),
     ],
-    wrapper_class=structlog.stdlib.BoundLogger,
-    context_class=dict,
     logger_factory=structlog.PrintLoggerFactory(),
     cache_logger_on_first_use=True,
 )
 ```
 
-**Log levels used:** `critical`, `error`, `warning`, `info`, `debug`.
+**Log levels used:** `info`, `warning`, `error` (via structlog stdlib integration).
 
 ### 9.2 Request Correlation IDs
 
-A custom ASGI middleware generates a unique `request_id` (UUIDv4) per request and attaches it to:
+A custom ASGI middleware (`app/main.py:156-162`) generates a UUIDv4 per request:
 
-- `request.state.request_id` — accessible in route handlers and dependencies
-- `X-Request-ID` response header — returned to the client
-- Every log line within the request via structlog's `bind(request_id=...)`
-
-This enables full traceability: given an error reported by a client, search logs for the request ID to see the complete request chain.
+- Bound via `structlog.contextvars.bound_contextvars(request_id=...)` for structured logging
+- Returned as `X-Request-ID` response header
+- NOT stored on `request.state` — only available via structlog context vars
 
 ### 9.3 Health Check Endpoints
 
-| Endpoint | Purpose | Checks |
-|---|---|---|
-| `GET /health` | Liveness probe (is the process alive?) | Returns 200 immediately |
-| `GET /health/ready` | Readiness probe (can it serve traffic?) | Pings PostgreSQL (`SELECT 1`), Redis (`PING`), returns 200 only if both respond |
+| Endpoint | Checks |
+|---|---|
+| `GET /api/v1/health` | Returns `{"status": "ok"}` immediately — no DB or Redis ping |
 
-These endpoints are **not** rate-limited and **not** authenticated. They are used by Docker's `HEALTHCHECK` and orchestrator (Kubernetes, ECS) probes.
+Only one health endpoint exists. No `/health/ready` endpoint. Not rate-limited, not authenticated. Used by Docker HEALTHCHECK.
 
 ### 9.4 Prometheus Metrics
 
-The `/metrics` endpoint (exposed via `prometheus-fastapi-instrumentator`) exposes:
-
-- `http_requests_total` — counter by method, path, status
-- `http_request_duration_seconds` — histogram (50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s buckets)
-- `db_query_duration_seconds` — histogram (SQLAlchemy event listener wrapping)
-- `active_users_total` — gauge (concurrent authenticated users, approximate)
-- `celery_task_duration_seconds` — histogram per task type
-- `redis_connected` — gauge (1 or 0)
-
-These are scraped by Prometheus and visualized in Grafana dashboards for:
-- Error rate by endpoint
-- P95/P99 response latency
-- Throughput (RPS)
-- Database connection pool usage
-- Queue depth and age (Celery stalled task alerts)
+[PLANNED — Not yet implemented. No prometheus-fastapi-instrumentator, no `/metrics` endpoint, no OpenTelemetry integration.]
 
 ---
 
 ## 10. Deployment Architecture
 
-### 10.1 Docker Multi-Stage Build
+### 10.1 Dockerfile
+
+From `backend/Dockerfile`:
 
 ```dockerfile
-# Stage 1: Dependencies
-FROM python:3.12-slim AS deps
+FROM python:3.13-alpine AS development
 WORKDIR /app
-RUN pip install --no-cache-dir poetry
-COPY pyproject.toml poetry.lock ./
-RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Stage 2: Production
-FROM python:3.12-slim AS production
-WORKDIR /app
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
-COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY . .
-RUN pip install --no-cache-dir -r requirements.txt
-USER appuser
+COPY scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 ```
 
-This produces a slim image (~150MB) with only production dependencies and compiled Python bytecode. No build tools, no dev dependencies.
+Single-stage development image. Production image uses a separate `docker-compose.prod.yml`. Entrypoint runs `alembic upgrade head` before starting the server.
 
 ### 10.2 Docker Compose (Local Development)
+
+From `backend/docker-compose.yml`:
 
 ```yaml
 services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.dev
-    volumes:
-      - .:/app
+      target: development
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/acharya
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:8000"]
     volumes:
       - .:/app
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/acharya
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A app.workers.celery_app worker --loglevel=info
+      - /app/__pycache__
+    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
 
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: acharya
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d acharya"]
-      interval: 5s
+    profiles: ["local-db"]
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
+    profiles: ["local-db"]
+    ports: ["6379:6379"]
+    volumes: [redisdata:/data]
 
 volumes:
   pgdata:
   redisdata:
 ```
 
+Note: The `app` service reads credentials from `.env` (default: Supabase URL). The `postgres` and `redis` services are gated behind `--profile local-db` and are not started by default with `docker compose up`. No Celery worker service exists.
+
 ### 10.3 Environment Configuration
 
-All configuration is loaded from environment variables and validated by pydantic-settings at import time. If any required variable is missing or malformed, the process exits immediately with a clear error message.
+All configuration is loaded from environment variables and validated by pydantic-settings at import time. From `app/core/config.py`:
 
 ```python
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore")
 
-    environment: str = "development"
-    port: int = 8000
-    database_url: str
-    redis_url: str = "redis://localhost:6379/0"
-    jwt_secret: str
-    jwt_access_expiry: int = 15  # minutes
-    jwt_refresh_expiry: int = 7   # days
-    s3_region: str
-    s3_bucket: str
-    s3_access_key_id: str
-    s3_secret_access_key: str
-    smtp_host: str
-    smtp_port: int = 587
-    smtp_user: str
-    smtp_pass: str
-    cors_origins: list[str] = ["http://localhost:5173"]
-    rate_limit_window_ms: int = 60000
-    rate_limit_max: int = 100
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
+    PORT: int = 8000
+    API_PREFIX: str = "/api/v1"
 
-settings = Settings()
+    DATABASE_URL: str = ""           # If empty, auto-built from DB_* components
+    DB_USER: str = "postgres.qwouxrnnwmkotkwraqme"
+    DB_PASSWORD: str = ""
+    DB_HOST: str = "aws-1-ap-northeast-1.pooler.supabase.com"
+    DB_PORT: int = 5432
+    DB_NAME: str = "postgres"
+
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    JWT_SECRET: str = ""             # Auto-generated random in development
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_EXPIRE_MINUTES: int = 15
+    JWT_REFRESH_EXPIRE_DAYS: int = 7
+
+    CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:8000"]
+    LOG_LEVEL: str = "INFO"
 ```
 
 | Variable | Required | Description |
 |---|---|---|
-| `ENVIRONMENT` | Yes | `development`, `production`, or `test` |
-| `PORT` | No (default 8000) | HTTP server port |
-| `DATABASE_URL` | Yes | PostgreSQL async connection string (`postgresql+asyncpg://...`) |
-| `REDIS_URL` | Yes | Redis connection string |
-| `JWT_SECRET` | Yes | Symmetric key for signing JWTs (min 32 chars) |
-| `JWT_ACCESS_EXPIRY` | No (default 15) | Access token expiry in minutes |
-| `JWT_REFRESH_EXPIRY` | No (default 7) | Refresh token expiry in days |
-| `S3_REGION` | Yes | AWS region |
-| `S3_BUCKET` | Yes | S3 bucket name |
-| `S3_ACCESS_KEY_ID` | Yes | AWS access key |
-| `S3_SECRET_ACCESS_KEY` | Yes | AWS secret key |
-| `SMTP_HOST` | Yes | SMTP server host |
-| `SMTP_PORT` | No (default 587) | SMTP server port |
-| `SMTP_USER` | Yes | SMTP username |
-| `SMTP_PASS` | Yes | SMTP password |
-| `CORS_ORIGINS` | No | Comma-separated allowed origins |
-| `RATE_LIMIT_WINDOW_MS` | No (default 60000) | Rate limit window in ms |
-| `RATE_LIMIT_MAX` | No (default 100) | Max requests per window |
+| `ENVIRONMENT` | No (default: development) | `development`, `production`, or `test` |
+| `DATABASE_URL` | Conditional | Full asyncpg URL; if empty, requires `DB_PASSWORD` |
+| `DB_PASSWORD` | Conditional | Supabase password — constructs URL from hardcoded defaults |
+| `REDIS_URL` | No (default: localhost:6379) | Redis connection string |
+| `JWT_SECRET` | Conditional | Auto-generated in development; required in production (min 32 chars) |
+| `CORS_ORIGINS` | No | JSON string array |
 
 ### 10.4 Deployment Strategy
 
@@ -771,16 +722,16 @@ alembic upgrade head
 | 1 | **Architecture** | Modular Monolith | Microservices | Lower operational burden at current scale (hundreds of concurrent users). Clear module boundaries allow future extraction if needed. Microservices would add distributed transaction complexity, service mesh overhead, and require multiple deployments. |
 | 2 | **Framework** | FastAPI | Flask, Django, Starlette | FastAPI is async-native with auto-generated OpenAPI docs, Pydantic v2 integration, and dependency injection — zero boilerplate for validation and documentation. Flask lacks async support and validation infrastructure. Django is monolithic and heavy for a pure API service. Starlette is lower-level (FastAPI is built on it) and would require manual OpenAPI generation. |
 | 3 | **ORM** | SQLAlchemy 2.0 (async) | Django ORM, Tortoise-ORM, GINO | SQLAlchemy 2.0 is the most mature Python ORM with full async support via asyncpg. Its declarative mapping with type annotations, relationship loading strategies, and comprehensive query API make it superior for complex queries. Django ORM is tightly coupled to Django. Tortoise-ORM is less battle-tested. |
-| 4 | **Validation** | Pydantic v2 | attrs, msgspec, marshmallow | Pydantic v2's Rust-core engine (pydantic-core) provides 5-50x faster validation than v1. It is the default validation layer for FastAPI, eliminating the need for separate schema definitions. `model_validator` and `field_validator` enable complex validation logic. |
-| 5 | **Authentication** | JWT (access + refresh tokens) | Sessions (Starlette session middleware) | JWT is stateless — no database lookup on every request. Works seamlessly with mobile apps and SPAs. Session-based auth requires state storage and cookie management that complicates mobile integration. Refresh token rotation mitigates the inability to revoke JWTs. |
-| 6 | **Password Hashing** | passlib[bcrypt] | argon2-cffi, hashlib/PBKDF2 | bcrypt with cost factor 12 is the industry standard; passlib's `CryptContext` supports automatic algorithm migration. Argon2 was considered but bcrypt's broader library support and simpler configuration provide a better DX for this project while maintaining strong security. |
-| 7 | **File Uploads** | Presigned S3 URLs | Proxy through server, Multipart direct to API | Presigned URLs allow clients to upload directly to S3 without the server acting as an intermediary. This eliminates the server memory bottleneck (no buffering large files), reduces latency, and lowers bandwidth costs. The server only signs a URL (a lightweight operation). |
-| 8 | **Background Jobs** | Celery | In-process asyncio.create_task, plain Redis pub/sub, Huey, Dramatiq | Celery provides persistent queues with built-in retries, rate limiting, scheduled tasks (celery beat), and Flower monitoring UI. In-process tasks have no persistence — if the worker crashes, tasks are lost. Plain Redis pub/sub has no persistence. Huey and Dramatiq have smaller ecosystems. |
-| 9 | **Logging** | structlog | logging (stdlib), loguru | structlog provides structured JSON logging with processor pipelines, bound loggers for request-scoped context (correlation IDs), and easy integration with standard library logging. Loguru is simpler but less flexible for production JSON output pipelines. |
-| 10 | **API Documentation** | FastAPI auto OpenAPI | Manual OpenAPI, Apispec, Flask-RESTx | FastAPI automatically generates OpenAPI 3.1 spec from route definitions and Pydantic schemas — zero additional code. Interactive docs at `/docs` (Swagger) and `/redoc` (ReDoc) are built in. Manual OpenAPI would duplicate schema definitions. Apispec requires explicit schema annotations. |
-| 11 | **Database** | PostgreSQL 16 | MySQL 8, SQLite, MongoDB | PostgreSQL offers superior ACID compliance, advanced indexing (JSONB, GiST for full-text search), and mature replication. MySQL historically has weaker compliance with SQL standards and ACID guarantees in certain configurations. MongoDB's lack of ACID transactions (until very recently) and schema-less nature are inappropriate for a system with strict data integrity requirements. |
-| 12 | **Cache** | Redis (redis-py) | In-memory dict, Memcached | Redis is already required for Celery and rate limiting. Using it also for cache eliminates an additional infrastructure dependency. redis-py 5+ includes the `aioredis` functionality natively for async operations. |
-| 13 | **Deployment** | Docker + Blue-Green | Serverless (Lambda via Mangum), Single-server manual | Docker ensures environment parity across development, staging, and production. Blue-green deployment provides zero-downtime updates. Serverless via Mangum is possible for FastAPI but unsuitable for a service with long-running Celery workers. |
-| 14 | **Migrations** | CI/CD step (alembic upgrade head) | App startup auto-migration, Alembic at entrypoint | Running migrations at startup is convenient but dangerous — multiple instances race to migrate, and migration failures cause application startup failures. Running migrations as an explicit CI/CD step ensures they complete before traffic is routed to the new version. |
+| 4 | **Validation** | Pydantic v2 | attrs, msgspec, marshmallow | Pydantic v2's Rust-core engine (pydantic-core) provides 5-50x faster validation than v1. It is the default validation layer for FastAPI. |
+| 5 | **Authentication** | JWT (access + refresh tokens, PyJWT[crypto]) | Sessions (Starlette), python-jose | JWT is stateless — no database lookup on every request. PyJWT chosen over python-jose for broader maintenance and HS256 support. |
+| 6 | **Password Hashing** | bcrypt (direct) | passlib[bcrypt], argon2-cffi | Direct bcrypt used instead of passlib for simplicity. Cost factor 12 via default `bcrypt.gensalt()`. |
+| 7 | **File Uploads** | [PLANNED] Presigned S3 URLs | N/A | Not yet implemented. |
+| 8 | **Background Jobs** | [REJECTED] Celery removed from requirements | In-process async | Celery not needed — notifications are synchronous/in-app. Can be added later if email async is needed. |
+| 9 | **Logging** | structlog | logging (stdlib), loguru | structlog with JSONRenderer for structured logs, request-ID middleware for traceability. |
+| 10 | **API Documentation** | FastAPI auto OpenAPI | Manual OpenAPI, Apispec | FastAPI auto-generates OpenAPI 3.1 spec; served at `/api/v1/docs` and `/api/v1/redoc`. |
+| 11 | **Database** | PostgreSQL 16 (Supabase) | MySQL 8, SQLite, MongoDB | Supabase managed Postgres with PgBouncer pooler. ACID compliant, managed backups, connection pooling. |
+| 12 | **Cache** | Redis (redis-py + upstash-redis) | In-memory dict, Memcached | Redis used for rate limiting (sliding window). Upstash Redis available as REST-based alternative. |
+| 13 | **Deployment** | Docker (single-stage) | Blue-Green, Serverless | Single Dockerfile for dev; `docker-compose.prod.yml` for production. Blue-green deployment planned. |
+| 14 | **Migrations** | Docker entrypoint + CI step | App startup auto-migration | `alembic upgrade head` runs at Docker entrypoint and as CI step — not at application startup. |
 
 (End of file - total 729 lines)

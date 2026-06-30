@@ -1,8 +1,12 @@
 import uuid
+from datetime import timedelta
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.core.redis import get_redis
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -13,7 +17,33 @@ from app.core.security import (
 from app.models.user import User, Role, UserStatus
 from app.schemas.auth import SignupRequest
 
-_blacklisted_tokens: set[str] = set()
+logger = structlog.get_logger()
+
+_blacklisted_tokens_fallback: set[str] = set()
+
+_BLACKLIST_PREFIX = "bl:"
+
+
+async def _is_blacklisted(token: str) -> bool:
+    redis = await get_redis()
+    if redis is not None:
+        try:
+            exists = await redis.get(_BLACKLIST_PREFIX + token)
+            return exists is not None
+        except Exception:
+            logger.warning("Redis check failed, falling back to in-memory blacklist")
+    return token in _blacklisted_tokens_fallback
+
+
+async def _add_to_blacklist(token: str, ttl_seconds: int) -> None:
+    redis = await get_redis()
+    if redis is not None:
+        try:
+            await redis.setex(_BLACKLIST_PREFIX + token, ttl_seconds, "1")
+            return
+        except Exception:
+            logger.warning("Redis set failed, falling back to in-memory blacklist")
+    _blacklisted_tokens_fallback.add(token)
 
 
 def _enum_val(v):
@@ -114,7 +144,7 @@ async def refresh(db: AsyncSession, refresh_token: str) -> dict:
             detail="Invalid token type",
         )
 
-    if refresh_token in _blacklisted_tokens:
+    if await _is_blacklisted(refresh_token):
         from fastapi import HTTPException, status
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -134,13 +164,13 @@ async def refresh(db: AsyncSession, refresh_token: str) -> dict:
     new_access = create_access_token(user_id=user_id, role=actual_role)
     new_refresh = create_refresh_token(user_id=user_id)
 
-    _blacklisted_tokens.add(refresh_token)
+    await _add_to_blacklist(refresh_token, settings.JWT_REFRESH_EXPIRE_DAYS * 86400)
 
     return {"accessToken": new_access, "refreshToken": new_refresh}
 
 
 async def logout(refresh_token: str) -> dict:
-    _blacklisted_tokens.add(refresh_token)
+    await _add_to_blacklist(refresh_token, settings.JWT_REFRESH_EXPIRE_DAYS * 86400)
     return {"message": "Logged out successfully"}
 
 

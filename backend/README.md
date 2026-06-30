@@ -59,17 +59,17 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and set a strong `JWT_SECRET` (minimum 32 characters):
+Edit `.env` and set your Supabase database password and a strong `JWT_SECRET` (or leave `JWT_SECRET` unset — a development secret is auto-generated):
 
 ```bash
-# Generate one with:
+# Generate a production JWT secret:
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-For the database you can either set `DATABASE_URL` directly or use the component fields:
+For the database you can either set `DATABASE_URL` directly or use the component fields (requires `DB_PASSWORD`):
 
 ```
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/acharya
+DATABASE_URL=postgresql+asyncpg://postgres.qwouxrnnwmkotkwraqme:YOUR_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?ssl=require
 ```
 
 > [!TIP]
@@ -97,12 +97,9 @@ docker compose up
 
 # Production
 docker compose -f docker-compose.prod.yml up
-```
 
-Includes an optional local Postgres + Redis stack:
-
-```bash
-docker compose --profile local-db up
+# Optional local Postgres + Redis (for offline dev without Supabase):
+# docker compose --profile local-db up
 ```
 
 ## Configuration
@@ -153,7 +150,10 @@ pytest -m e2e
 pytest --cov=app --cov-report=term-missing
 ```
 
-The test suite covers **97%** of the codebase with 333 passing tests. Mocking strategy uses `AsyncMock` for async database sessions and `MagicMock` for SQLAlchemy models.
+The test suite covers **97%** of the codebase with 333 tests. Mocking strategy uses `AsyncMock` for async database sessions and `MagicMock` for SQLAlchemy models.
+
+> [!NOTE]
+> Tests in `tests/real_db/` run against the database configured via `DATABASE_URL` or `DB_PASSWORD` in `.env`. These are **not skipped** — they will error if the database is unreachable. See `.env.example` for Supabase configuration.
 
 ## Project structure
 

@@ -20,7 +20,7 @@ class Attendance(TimestampMixin, Base):
     student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     marked_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     attendance_date: Mapped[date] = mapped_column(Date, nullable=False)
-    status: Mapped[AttendanceStatus] = mapped_column(SAEnum(AttendanceStatus), default=AttendanceStatus.PRESENT, nullable=False)
+    status: Mapped[AttendanceStatus] = mapped_column(SAEnum(AttendanceStatus, values_callable=lambda obj: [e.value for e in obj]), default=AttendanceStatus.PRESENT, nullable=False)
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     event: Mapped["Event"] = relationship(back_populates="attendance_records")

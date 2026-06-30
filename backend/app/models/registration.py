@@ -23,8 +23,8 @@ class Registration(TimestampMixin, Base):
 
     event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
     student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    role_type: Mapped[RegistrationRole] = mapped_column(SAEnum(RegistrationRole), nullable=False)
-    status: Mapped[RegistrationStatus] = mapped_column(SAEnum(RegistrationStatus), default=RegistrationStatus.PENDING, nullable=False)
+    role_type: Mapped[RegistrationRole] = mapped_column(SAEnum(RegistrationRole, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    status: Mapped[RegistrationStatus] = mapped_column(SAEnum(RegistrationStatus, values_callable=lambda obj: [e.value for e in obj]), default=RegistrationStatus.PENDING, nullable=False)
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     event: Mapped["Event"] = relationship(back_populates="registrations")

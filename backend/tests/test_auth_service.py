@@ -216,16 +216,16 @@ class TestRefresh:
 
     async def test_raises_on_blacklisted_token(self):
         from app.models.user import User
-        from app.services.auth import refresh, _blacklisted_tokens
+        from app.services.auth import refresh, _blacklisted_tokens_fallback, _add_to_blacklist
 
-        _blacklisted_tokens.clear()
+        _blacklisted_tokens_fallback.clear()
 
         user = User(id=uuid.uuid4(), name="Test", email="test@test.com")
         mock_db = AsyncMock()
         mock_db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=user))
 
         payload = {"sub": str(user.id), "type": "refresh"}
-        _blacklisted_tokens.add("revoked-token")
+        await _add_to_blacklist("revoked-token", 3600)
 
         with patch("app.services.auth.verify_token", return_value=payload):
             from app.services.auth import refresh
@@ -251,10 +251,11 @@ class TestRefresh:
 @pytest.mark.asyncio
 class TestLogout:
     async def test_blacklists_token(self):
-        from app.services.auth import logout, _blacklisted_tokens
+        from app.services.auth import logout, _blacklisted_tokens_fallback, _add_to_blacklist
 
+        _blacklisted_tokens_fallback.clear()
         await logout(refresh_token="token-to-blacklist")
-        assert "token-to-blacklist" in _blacklisted_tokens
+        assert "token-to-blacklist" in _blacklisted_tokens_fallback
 
 
 @pytest.mark.asyncio

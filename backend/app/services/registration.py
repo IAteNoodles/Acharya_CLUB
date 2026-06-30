@@ -21,7 +21,7 @@ class RegistrationService:
     ) -> Registration:
         event = await db.get(Event, event_id)
         if not event:
-            raise NotFoundException("Event not found")
+            raise NotFoundException(detail="Event not found")
         if event.status != EventStatus.APPROVED:
             raise ConflictException("Event is not open for registration")
         if not event.coordinator_id:
@@ -135,11 +135,11 @@ class RegistrationService:
     ) -> Registration:
         reg = await db.get(Registration, registration_id)
         if not reg:
-            raise NotFoundException("Registration not found")
+            raise NotFoundException(detail="Registration not found")
 
         event = await db.get(Event, reg.event_id)
         if not event:
-            raise NotFoundException("Event not found")
+            raise NotFoundException(detail="Event not found")
 
         user_id = uuid.UUID(current_user["sub"])
         if current_user["role"] != "admin" and event.coordinator_id != user_id:
@@ -174,11 +174,11 @@ class RegistrationService:
     ) -> Registration:
         reg = await db.get(Registration, registration_id)
         if not reg:
-            raise NotFoundException("Registration not found")
+            raise NotFoundException(detail="Registration not found")
 
         event = await db.get(Event, reg.event_id)
         if not event:
-            raise NotFoundException("Event not found")
+            raise NotFoundException(detail="Event not found")
 
         user_id = uuid.UUID(current_user["sub"])
         if current_user["role"] != "admin" and event.coordinator_id != user_id:

@@ -4,11 +4,10 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
-from testcontainers.postgres import PostgresContainer
 
+from app.core.config import settings
 from app.models.user import User, Role, UserStatus
 from app.models.base import Base
 
@@ -19,28 +18,29 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture(scope="session")
-def pg_container():
-    with PostgresContainer("postgres:16-alpine") as pg:
-        yield pg
+def async_engine():
+    db_url = settings.DATABASE_URL
 
+    import app.models.user
+    import app.models.event
+    import app.models.registration
+    import app.models.attendance
+    import app.models.notification
 
-@pytest.fixture(scope="session")
-def async_engine(pg_container):
-    db_url = pg_container.get_connection_url(driver="asyncpg")
+    engine = create_async_engine(db_url, echo=False, poolclass=NullPool, connect_args={"statement_cache_size": 0})
 
-    sync_url = db_url.replace("+asyncpg", "")
-    sync_engine = create_engine(sync_url)
-    import app.models.user  # noqa
-    import app.models.event  # noqa
-    import app.models.registration  # noqa
-    import app.models.attendance  # noqa
-    import app.models.notification  # noqa
-    Base.metadata.create_all(sync_engine)
-    sync_engine.dispose()
+    async def _probe():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    engine = create_async_engine(db_url, echo=False, poolclass=NullPool)
+    asyncio.run(_probe())
+
     yield engine
-    engine.sync_engine.dispose()
+
+    async def _cleanup():
+        await engine.dispose()
+
+    asyncio.run(_cleanup())
 
 
 @pytest_asyncio.fixture

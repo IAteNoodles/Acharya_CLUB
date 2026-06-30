@@ -31,9 +31,9 @@ class Event(TimestampMixin, Base):
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    event_type: Mapped[EventType] = mapped_column(SAEnum(EventType), nullable=False)
-    category: Mapped[EventCategory] = mapped_column(SAEnum(EventCategory), nullable=False)
-    status: Mapped[EventStatus] = mapped_column(SAEnum(EventStatus), default=EventStatus.DRAFT, nullable=False)
+    event_type: Mapped[EventType] = mapped_column(SAEnum(EventType, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    category: Mapped[EventCategory] = mapped_column(SAEnum(EventCategory, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    status: Mapped[EventStatus] = mapped_column(SAEnum(EventStatus, values_callable=lambda obj: [e.value for e in obj]), default=EventStatus.DRAFT, nullable=False)
     venue: Mapped[str] = mapped_column(String(300), nullable=False)
     start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

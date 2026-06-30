@@ -33,8 +33,8 @@ def clear_env():
     saved = _save_core_modules()
     keys = [k for k in os.environ if k.startswith(("ENVIRONMENT", "DEBUG", "APP_NAME", "API_PREFIX",
                                                     "HOST", "PORT", "DATABASE_URL", "DATABASE_POOL_SIZE",
-                                                    "DATABASE_MAX_OVERFLOW", "REDIS_URL", "JWT_SECRET",
-                                                    "JWT_ALGORITHM", "JWT_ACCESS_EXPIRE_MINUTES",
+                                                    "DATABASE_MAX_OVERFLOW", "DB_PASSWORD", "REDIS_URL",
+                                                    "JWT_SECRET", "JWT_ALGORITHM", "JWT_ACCESS_EXPIRE_MINUTES",
                                                     "JWT_REFRESH_EXPIRE_DAYS", "CORS_ORIGINS", "LOG_LEVEL"))]
     for k in keys:
         del os.environ[k]
@@ -72,26 +72,15 @@ def test_config_defaults():
     assert settings.LOG_LEVEL == "INFO"
 
 
-def test_config_raises_on_missing_required():
-    # Temporarily remove .env so pydantic-settings can't read from it
-    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-    renamed = False
-    if os.path.exists(env_path):
-        os.rename(env_path, env_path + ".bak")
-        renamed = True
+def test_config_raises_on_missing_jwt_secret_in_production():
+    os.environ["ENVIRONMENT"] = "production"
+    os.environ["JWT_SECRET"] = ""
+    os.environ["DATABASE_URL"] = "postgresql+asyncpg://u:p@localhost:5432/test"
 
-    try:
-        for k in ["DATABASE_URL", "JWT_SECRET"]:
-            if k in os.environ:
-                del os.environ[k]
-
-        _reload_config()
-        with pytest.raises(Exception):
-            from app.core.config import Settings
-            Settings()
-    finally:
-        if renamed:
-            os.rename(env_path + ".bak", env_path)
+    _reload_config()
+    with pytest.raises(ValueError, match="JWT_SECRET must be set"):
+        from app.core.config import Settings
+        Settings()
 
 
 def test_config_builds_database_url_from_components():
@@ -103,24 +92,24 @@ def test_config_builds_database_url_from_components():
     os.environ["JWT_SECRET"] = "a" * 32
 
     _reload_config()
-    from app.core.config import get_settings
-    settings = get_settings()
+    from app.core.config import Settings
+    settings = Settings(DATABASE_URL="")
 
-    assert "DATABASE_URL" in settings.model_fields
     assert "my_secure_pass" in settings.DATABASE_URL
     assert settings.DATABASE_URL.startswith("postgresql+asyncpg://")
 
 
-def test_config_raises_on_placeholder_jwt_secret():
-    for k in ["DATABASE_URL", "JWT_SECRET"]:
+def test_config_raises_on_placeholder_jwt_secret_in_production():
+    for k in ["JWT_SECRET"]:
         if k in os.environ:
             del os.environ[k]
 
+    os.environ["ENVIRONMENT"] = "production"
     os.environ["DATABASE_URL"] = "postgresql+asyncpg://u:p@localhost:5432/test"
     os.environ["JWT_SECRET"] = "change-this-to-a-random-string-at-least-32-chars"
 
     _reload_config()
-    with pytest.raises(ValueError, match="JWT_SECRET is still set"):
+    with pytest.raises(ValueError, match="JWT_SECRET must be set"):
         from app.core.config import Settings
         Settings()
 
