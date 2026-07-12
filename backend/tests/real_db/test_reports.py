@@ -10,7 +10,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.registration import Registration, RegistrationRole, RegistrationStatus
 from app.models.user import User, Role, UserStatus
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.real_db]
 
 
 class TestReportsRealDB:

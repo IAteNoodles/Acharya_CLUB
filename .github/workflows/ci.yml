@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -28,27 +28,44 @@ jobs:
         image: redis:7-alpine
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:localdev@localhost:5432/acharya
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: test-secret-key-at-least-32-characters-long
 
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Set up Python 3.13
+
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: '3.12'
         cache: 'pip'
-        
+        cache-dependency-path: backend/requirements.txt
+
     - name: Install dependencies
       run: |
         cd backend
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        
-    - name: Run tests
-      env:
-        DATABASE_URL: postgresql+asyncpg://postgres:localdev@localhost:5432/acharya
-        REDIS_URL: redis://localhost:6379/0
-        JWT_SECRET: test-secret-key-at-least-32-characters-long
+
+    - name: Run database migrations
       run: |
         cd backend
-        pytest -v
+        alembic upgrade head
+
+    - name: Run unit tests (no DB required)
+      run: |
+        cd backend
+        pytest -v --ignore=tests/real_db/
+
+    - name: Run real-DB tests (against CI Postgres)
+      run: |
+        cd backend
+        pytest -v tests/real_db/

@@ -14,7 +14,7 @@ A production-grade REST API that digitises the full lifecycle of college events 
 
 | Layer | Technology |
 |---|---|
-| Runtime | Python 3.13 |
+| Runtime | Python 3.12+ |
 | Web Framework | FastAPI 0.138+ |
 | ASGI Server | Uvicorn 0.34 |
 | ORM | SQLAlchemy 2.0 (async via asyncpg) |
@@ -265,7 +265,7 @@ events 1──N attendance
 - **User** — name, email (unique), password_hash, role (student/teacher/admin), status (pending/active/rejected)
 - **Event** — title, description, event_type, category, status (draft/pending/approved/rejected), venue, dates, max_registrations
 - **Registration** — event + student + role_type (volunteer/participant), status (pending/accepted/rejected), unique per (event, student, role_type)
-- **Attendance** — event + student + date, status (present/absent/late), unique per (event, student, date)
+- **Attendance** — event + student + date, status (present/absent), unique per (event, student, date)
 - **Notification** — user, type (6 types), title, message, related entity, is_read
 
 ---
@@ -277,20 +277,17 @@ Three-layer testing strategy with 29 test files:
 | Layer | Approach | Dependencies | Speed |
 |---|---|---|---|
 | **Unit / Mock** | `AsyncMock`, `dependency_overrides`, `httpx.AsyncClient`+`ASGITransport` | None | Fast (~1-2s) |
-| **Real DB** | `testcontainers.PostgresContainer`, rollback-per-test | Docker (Postgres) | Moderate (~5-10s) |
+| **Real DB** | `testcontainers.PostgresContainer`, rollback-per-test | Docker | Moderate (~5-10s) |
 | **E2E** | `PostgresContainer` + `RedisContainer`, full lifecycle | Docker (both) | Slow (~20-30s) |
 
 ```bash
-# Default: unit + real DB tests (excludes E2E)
+# Default: unit/mock tests only (no Docker required)
 pytest -v
 
-# Unit/mock tests only
-pytest -v -m "not real_db and not e2e"
-
-# Real DB tests only
+# Real DB tests (requires Docker)
 pytest -v tests/real_db/
 
-# All tests including E2E
+# All tests including E2E (requires Docker)
 pytest -v -m ""
 
 # With coverage

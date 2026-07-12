@@ -165,6 +165,7 @@ class TestUserService:
         from app.services.user import approve_teacher
 
         mock_session = AsyncMock()
+        mock_session.add = MagicMock()  # add() is synchronous on AsyncSession
         mock_user = _make_mock_user(
             id="550e8400-e29b-41d4-a716-446655440011",
             name="Teacher A",
@@ -264,6 +265,7 @@ class TestUserService:
         from app.services.user import reject_teacher
 
         mock_session = AsyncMock()
+        mock_session.add = MagicMock()  # add() is synchronous on AsyncSession
         mock_user = _make_mock_user(
             id="550e8400-e29b-41d4-a716-446655440015",
             name="Teacher A",

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.models.event import Event, EventStatus, EventType, EventCategory
 from app.schemas.event import EventCreate
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.real_db]
 
 
 class TestEventsRealDB:
@@ -175,6 +175,7 @@ class TestEventsRealDB:
 
         updated = await EventService.assign_coordinator(
             db_session, str(event.id), str(teacher_user.id),
+            {"sub": str(admin_user.id), "role": "admin"},
         )
 
         assert updated.coordinator_id == teacher_user.id

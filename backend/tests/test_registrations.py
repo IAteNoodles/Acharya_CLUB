@@ -41,6 +41,7 @@ class TestRegistrationService:
         from app.services.registration import RegistrationService
 
         db = AsyncMock()
+        db.add = MagicMock()  # add() is synchronous on AsyncSession
         mock_event = MagicMock()
         mock_event.status = "approved"
         mock_event.coordinator_id = uuid.uuid4()
@@ -198,6 +199,7 @@ class TestRegistrationService:
         from app.services.registration import RegistrationService
 
         db = AsyncMock()
+        db.add = MagicMock()  # add() is synchronous on AsyncSession
         mock_reg = MagicMock()
         mock_reg.status = RegistrationStatus.PENDING
         mock_reg.event_id = EVENT_ID
@@ -247,6 +249,7 @@ class TestRegistrationService:
         from app.services.registration import RegistrationService
 
         db = AsyncMock()
+        db.add = MagicMock()  # add() is synchronous on AsyncSession
         mock_reg = MagicMock()
         mock_reg.status = RegistrationStatus.PENDING
         mock_reg.event_id = EVENT_ID

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.models.user import User
 from app.schemas.auth import SignupRequest
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.real_db]
 
 
 class TestSignupRealDB:

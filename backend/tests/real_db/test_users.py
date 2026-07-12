@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.models.user import User, Role, UserStatus
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.real_db]
 
 
 async def _create_pending_teacher(db, name="Teacher A"):

@@ -9,7 +9,7 @@ Manage events, registrations, attendance, and in-app notifications with role-bas
 - **Role-based access** — Students, teachers, and admins with granular permissions per endpoint.
 - **Event lifecycle** — Admins create in-college events, students create out-college events. Teachers can only act as coordinators (approving events and marking attendance), they do not create events.
 - **Registration system** — Students register as volunteers or participants; coordinators accept or reject.
-- **Attendance tracking** — Bulk mark attendance per event/date with present/absent/late status.
+- **Attendance tracking** — Bulk mark attendance per event/date with present/absent status.
 - **Notification system** — In-app notifications for registration acceptance/rejection, event approval/rejection, and teacher approval/rejection.
 - **Dashboard & reports** — Aggregate stats on users, events, registrations, attendance, and notifications.
 - **Rate limiting** — Sliding-window rate limiter (general 100 req/min, auth 20 req/min) with Redis or in-memory fallback.
@@ -130,7 +130,7 @@ The API prefix is `/api/v1`.
 |---|---|---|---|
 | `health` | `GET /health` | No | Health check |
 | `auth` | `POST /signup`, `/login`, `/refresh`, `/logout`, `GET /me` | Mixed | Authentication |
-| `events` | `GET`, `POST`, `GET /{id}`, `PUT /{id}`, `POST /{id}/approve`, `POST /{id}/reject`, `POST /{id}/assign-coordinator` | JWT | Event CRUD and moderation |
+| `events` | `GET`, `POST`, `GET /{id}`, `PATCH /{id}`, `PATCH /{id}/approve`, `PATCH /{id}/reject`, `PATCH /{id}/assign-coordinator` | JWT | Event CRUD and moderation |
 | `registrations` | `POST /`, `GET /my`, `GET /event/{id}`, `PATCH /{id}/accept`, `PATCH /{id}/reject` | JWT | Registration management |
 | `attendance` | `POST /bulk`, `GET /event/{id}`, `GET /my` | JWT | Attendance tracking |
 | `notifications` | `GET /`, `PATCH /{id}/read`, `POST /read-all` | JWT | In-app notifications |
@@ -140,11 +140,11 @@ The API prefix is `/api/v1`.
 ## Testing
 
 ```bash
-# Unit and integration tests (default)
+# Unit and integration tests (default — no Docker required)
 pytest
 
-# Exclude slow tests
-pytest -m "not slow"
+# Real DB tests (require Docker for testcontainers)
+pytest tests/real_db/
 
 # End-to-end tests (requires Docker)
 pytest -m e2e
@@ -156,14 +156,14 @@ pytest --cov=app --cov-report=term-missing
 The test suite covers **97%** of the codebase with 333 tests. Mocking strategy uses `AsyncMock` for async database sessions and `MagicMock` for SQLAlchemy models.
 
 > [!NOTE]
-> Tests in `tests/real_db/` run against the database configured via `DATABASE_URL` or `DB_PASSWORD` in `.env`. These are **not skipped** — they will error if the database is unreachable. See `.env.example` for Supabase configuration.
+> Tests in `tests/real_db/` spin up an ephemeral Postgres via **testcontainers** — Docker must be running. They are excluded from the default `pytest` invocation and run explicitly in CI.
 
 ## Project structure
 
 ```
 backend/
 ├── alembic/              # Database migrations
-│   └── versions/         # 0001_initial_schema, 0002_notifications
+│   └── versions/         # 0001_initial_schema, 0002_notifications, 0003_remove_late_attendance
 ├── app/
 │   ├── api/
 │   │   ├── deps.py       # Auth dependencies (get_current_user, require_admin, etc.)
@@ -189,7 +189,7 @@ backend/
 
 | Layer | Technology |
 |---|---|
-| Runtime | Python 3.13 |
+| Runtime | Python 3.12+ |
 | Framework | FastAPI 0.138 |
 | ASGI server | uvicorn 0.34 |
 | ORM | SQLAlchemy 2.0 (async) |

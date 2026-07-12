@@ -6,8 +6,8 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
+from testcontainers.postgres import PostgresContainer
 
-from app.core.config import settings
 from app.models.user import User, Role, UserStatus
 from app.models.base import Base
 
@@ -18,22 +18,38 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture(scope="session")
-def async_engine():
-    db_url = settings.DATABASE_URL
+def postgres_container():
+    """Start an ephemeral Postgres container for the test session."""
+    with PostgresContainer("postgres:16-alpine") as pg:
+        yield pg
 
-    import app.models.user
-    import app.models.event
-    import app.models.registration
-    import app.models.attendance
-    import app.models.notification
 
-    engine = create_async_engine(db_url, echo=False, poolclass=NullPool, connect_args={"statement_cache_size": 0})
+@pytest.fixture(scope="session")
+def async_engine(postgres_container):
+    # Build asyncpg URL from the container's sync URL
+    sync_url = postgres_container.get_connection_url()
+    db_url = sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://").replace(
+        "postgresql://", "postgresql+asyncpg://"
+    )
 
-    async def _probe():
+    import app.models.user  # noqa: F401
+    import app.models.event  # noqa: F401
+    import app.models.registration  # noqa: F401
+    import app.models.attendance  # noqa: F401
+    import app.models.notification  # noqa: F401
+
+    engine = create_async_engine(
+        db_url,
+        echo=False,
+        poolclass=NullPool,
+        connect_args={"statement_cache_size": 0},
+    )
+
+    async def _bootstrap():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    asyncio.run(_probe())
+    asyncio.run(_bootstrap())
 
     yield engine
 
@@ -50,9 +66,11 @@ async def db_session(async_engine):
 
     session = AsyncSession(bind=conn, expire_on_commit=False)
 
-    async def _commit():
+    # Override commit → flush so tests never permanently commit
+    async def _flush_only():
         await session.flush()
-    session.commit = _commit
+
+    session.commit = _flush_only
 
     yield session
 

@@ -31,8 +31,10 @@ class TestNotificationService:
     @pytest.mark.asyncio
     async def test_create_notification(self):
         from app.services.notification import NotificationService
+        from unittest.mock import MagicMock
 
         db = AsyncMock()
+        db.add = MagicMock()  # add() is synchronous on AsyncSession
 
         notif = await NotificationService.create_notification(
             db, user_id=USER_ID, notif_type="registration_accepted",

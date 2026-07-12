@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.models.notification import Notification, NotificationType
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.real_db]
 
 
 class TestNotificationsRealDB:

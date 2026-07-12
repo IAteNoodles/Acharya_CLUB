@@ -7,7 +7,7 @@ from app.models.attendance import Attendance, AttendanceStatus
 from app.models.event import Event, EventStatus, EventType, EventCategory
 from app.models.registration import Registration, RegistrationRole, RegistrationStatus
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.real_db]
 
 
 async def _setup_event_with_accepted_student(db, admin_user, teacher_user):

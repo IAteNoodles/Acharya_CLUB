@@ -2,7 +2,7 @@
 name = "acharya-club-backend"
 version = "1.0.0"
 description = "Acharya_CLUB - College Event Management System Backend"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.138.0,<0.139.0",
     "uvicorn[standard]==0.34.0",
@@ -29,11 +29,12 @@ include = ["app*"]
 [tool.pytest.ini_options]
 markers = [
     "e2e: marks tests as end-to-end (uses testcontainers, session-scoped loop)",
+    "real_db: marks tests that require a real Postgres database (via testcontainers)",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
-addopts = "-m 'not e2e'"
+addopts = "-m 'not e2e and not real_db'"
 
 [dependency-groups]
 dev = [
