@@ -1861,7 +1861,7 @@ class MarkAttendanceRequest(BaseModel):
 }
 ```
 
-**Note:** The `present: bool` field maps to `AttendanceStatus` as `true` → `present`, `false` → `absent`. The `late` status is not settable via this endpoint and requires a direct PATCH.
+**Note:** The `attendance` dictionary maps `studentId` -> `present: bool`. The boolean maps to `AttendanceStatus` as `true` → `present`, `false` → `absent`.
 
 **Endpoint:**
 
@@ -2167,7 +2167,6 @@ class RegistrationStatus(str, Enum):
 class AttendanceStatus(str, Enum):
     present = "present"
     absent = "absent"
-    late = "late"
 ```
 
 ---
@@ -2245,9 +2244,9 @@ class AttendanceResponse(BaseModel):
     studentId: str                             # UUID
     student: Optional[UserRef] = None          # Populated in event-level responses
     markedBy: str                              # UUID
-    date: date                                 # YYYY-MM-DD
-    status: AttendanceStatus                   # "present" | "absent" | "late"
-    markedAt: datetime
+    attendanceDate: str                        # "YYYY-MM-DD"
+    status: AttendanceStatus                   # "present" | "absent"
+    markedAt: str                              # "2026-06-25T14:35:00.000Z"
 ```
 
 ---
