@@ -1,0 +1,48 @@
+[project]
+name = "acharya-club-backend"
+version = "1.0.0"
+description = "Acharya_CLUB - College Event Management System Backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.138.0,<0.139.0",
+    "uvicorn[standard]==0.34.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "pydantic-settings>=2.7.0",
+    "PyJWT[crypto]>=2.13.0",
+    "bcrypt>=4.2.0",
+    "redis[hiredis]>=5.2.1",
+    "structlog>=24.4.0",
+    "upstash-redis>=1.7.0",
+    "python-multipart>=0.0.19",
+    "passlib>=1.7.4",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "e2e: marks tests as end-to-end (uses testcontainers, session-scoped loop)",
+    "real_db: marks tests that require a real Postgres database (via testcontainers)",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-m 'not e2e and not real_db'"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.1",
+    "pytest-cov>=6.0.0",
+    "fakeredis[lua]>=2.0.0",
+    "testcontainers[postgres,redis]>=4.0.0",
+    "psycopg2-binary>=2.9.12",
+]

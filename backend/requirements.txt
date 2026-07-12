@@ -1,0 +1,17 @@
+# ── Core ─────────────────────────────────────────────
+fastapi>=0.138.0,<0.139.0
+uvicorn[standard]==0.34.0
+sqlalchemy[asyncio]>=2.0.36
+aiosqlite>=0.20.0
+pydantic-settings>=2.7.0
+PyJWT[crypto]>=2.13.0
+bcrypt>=4.2.0
+structlog>=24.4.0
+python-multipart>=0.0.19
+passlib>=1.7.4
+
+# ── Dev ──────────────────────────────────────────────
+pytest>=8.3.4
+pytest-asyncio>=0.24.0
+httpx>=0.28.1
+pytest-cov>=6.0.0
