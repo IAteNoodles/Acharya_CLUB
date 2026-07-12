@@ -255,10 +255,7 @@ class TestLogout:
         from app.services.auth import logout, _blacklisted_tokens_fallback
 
         _blacklisted_tokens_fallback.clear()
-        # Patch get_redis to return None so the test always hits the
-        # in-memory fallback path regardless of whether Redis is running.
-        with patch("app.services.auth.get_redis", new=AsyncMock(return_value=None)):
-            await logout(refresh_token="token-to-blacklist")
+        await logout(refresh_token="token-to-blacklist")
         assert "token-to-blacklist" in _blacklisted_tokens_fallback
 
 

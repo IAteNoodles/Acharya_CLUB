@@ -21,89 +21,36 @@ Manage events, registrations, attendance, and in-app notifications with role-bas
 
 ```
 ┌──────────────┐     ┌─────────────────────────┐     ┌──────────────┐
-│   Frontend   │────▶│  FastAPI (uvicorn)       │────▶│  PostgreSQL  │
-│  (React SPA) │     │  app/                    │     │  (Supabase)  │
-└──────────────┘     │  ├── api/v1/   (routes)  │     └──────────────┘
-                     │  ├── services/ (logic)   │     ┌──────────────┐
-                     │  ├── models/   (ORM)     │────▶│  Redis       │
-                     │  ├── schemas/  (Pydantic)│     │  (Upstash)   │
-                     │  ├── middleware/         │     └──────────────┘
-                     │  └── core/     (config)  │
+│   Frontend   │────▶│  FastAPI (uvicorn)      │────▶│  SQLite DB   │
+│  (React SPA) │     │  app/                   │     │  (local file)│
+└──────────────┘     │  ├── api/v1/   (routes) │     └──────────────┘
+                     │  ├── services/ (logic)  │
+                     │  ├── models/   (ORM)    │
+                     │  ├── schemas/  (Pydantic)
+                     │  ├── middleware/        │
+                     │  └── core/     (config) │
                      └─────────────────────────┘
 ```
 
-The API follows a layered pattern: **routes → services → models**. Middleware handles rate limiting, security headers, request timeouts, and request-ID injection. Database migrations use Alembic.
+The API follows a layered pattern: **routes → services → models**. Middleware handles security headers, request timeouts, and request-ID injection. Database is created on startup automatically.
 
 ## Prerequisites
 
 - Python 3.12+
-- PostgreSQL 16+ (or a Supabase project)
-- Redis 7+ (optional, falls back to in-memory)
 
 ## Getting started
 
-### 1. Clone and install
-
 ```bash
 git clone <repo-url>
-cd Acharya_CLUB
-
-python -m venv .venv
-.venv\Scripts\activate     # Windows
-source .venv/bin/activate  # macOS/Linux
-
-cd backend
+cd Acharya_CLUB/backend
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+uvicorn app.main:create_app --factory --reload
 ```
 
-### 2. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set your Supabase database password and a strong `JWT_SECRET` (or leave `JWT_SECRET` unset — a development secret is auto-generated):
-
-```bash
-# Generate a production JWT secret:
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-
-For the database you can either set `DATABASE_URL` directly or use the component fields (requires `DB_PASSWORD`):
-
-```
-DATABASE_URL=postgresql+asyncpg://postgres.qwouxrnnwmkotkwraqme:YOUR_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?ssl=require
-```
-
-> [!TIP]
-> In production, set `DB_PASSWORD` via environment variable (not `.env`) and omit `DATABASE_URL`. The app constructs the full URL automatically.
-
-### 3. Run database migrations
-
-```bash
-alembic upgrade head
-```
-
-### 4. Start the server
-
-```bash
-uvicorn app.main:create_app --factory --reload --port 8000
-```
+No `.env` required (sane in-code defaults), no Docker, no external DB signup, no Redis, no CI. One file (`acharya_club.db`) holds all state. Tests run the same way, no containers.
 
 The API is available at `http://localhost:8000/api/v1`, with interactive docs at `/api/v1/docs`.
-
-### 5. Run with Docker
-
-```bash
-# Development (with hot-reload)
-docker compose up
-
-# Production
-docker compose -f docker-compose.prod.yml up
-
-# Optional local Postgres + Redis (for offline dev without Supabase):
-# docker compose --profile local-db up
-```
 
 ## Configuration
 
@@ -111,14 +58,10 @@ Key environment variables (see `.env.example` for defaults):
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL async connection string |
-| `DB_PASSWORD` | Supabase password (alternative to DATABASE_URL) |
+| `DATABASE_URL` | SQLite async connection string |
 | `JWT_SECRET` | Signing key for tokens (min 32 chars) |
 | `JWT_ACCESS_EXPIRE_MINUTES` | Access token TTL (default 15) |
 | `JWT_REFRESH_EXPIRE_DAYS` | Refresh token TTL (default 7) |
-| `REDIS_URL` | Redis connection string |
-| `UPSTASH_REDIS_REST_URL` | Upstash Redis URL (overrides REDIS_URL) |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis token |
 | `CORS_ORIGINS` | JSON array of allowed origins |
 | `REQUEST_TIMEOUT_SECONDS` | Request timeout (default 30) |
 
@@ -140,30 +83,19 @@ The API prefix is `/api/v1`.
 ## Testing
 
 ```bash
-# Unit and integration tests (default — no Docker required)
+# Run all tests
 pytest
-
-# Real DB tests (require Docker for testcontainers)
-pytest tests/real_db/
-
-# End-to-end tests (requires Docker)
-pytest -m e2e
 
 # With coverage
 pytest --cov=app --cov-report=term-missing
 ```
 
-The test suite covers **97%** of the codebase with 333 tests. Mocking strategy uses `AsyncMock` for async database sessions and `MagicMock` for SQLAlchemy models.
-
-> [!NOTE]
-> Tests in `tests/real_db/` spin up an ephemeral Postgres via **testcontainers** — Docker must be running. They are excluded from the default `pytest` invocation and run explicitly in CI.
+The test suite covers **97%** of the codebase with 279 tests. Mocking strategy uses `AsyncMock` for async database sessions and `MagicMock` for SQLAlchemy models.
 
 ## Project structure
 
 ```
 backend/
-├── alembic/              # Database migrations
-│   └── versions/         # 0001_initial_schema, 0002_notifications, 0003_remove_late_attendance
 ├── app/
 │   ├── api/
 │   │   ├── deps.py       # Auth dependencies (get_current_user, require_admin, etc.)
@@ -172,16 +104,14 @@ backend/
 │   │   ├── config.py     # Pydantic Settings with validators
 │   │   ├── database.py   # Async SQLAlchemy engine and session factory
 │   │   ├── exceptions.py # Custom exception classes + handlers
-│   │   ├── redis.py      # Redis/Upstash client singleton
 │   │   └── security.py   # JWT and bcrypt helpers
 │   ├── middleware/
-│   │   ├── rate_limit.py # Sliding-window rate limiter
 │   │   ├── security.py   # CSP, HSTS, X-Frame-Options headers
 │   │   └── timeout.py    # Request timeout middleware
 │   ├── models/           # SQLAlchemy ORM models
 │   ├── schemas/          # Pydantic request/response schemas
 │   └── services/         # Business logic layer
-├── scripts/              # Docker entrypoint, helpers
+├── scripts/              # Data seeder and helpers
 └── tests/                # pytest suite
 ```
 
@@ -193,13 +123,11 @@ backend/
 | Framework | FastAPI 0.138 |
 | ASGI server | uvicorn 0.34 |
 | ORM | SQLAlchemy 2.0 (async) |
-| Database | PostgreSQL 16 (asyncpg) |
-| Migrations | Alembic |
+| Database | SQLite (aiosqlite) |
 | Auth | PyJWT + bcrypt |
-| Cache/Rate limit | Redis 7 (redis-py), Upstash REST, or in-memory fallback |
 | Validation | Pydantic v2 + Pydantic Settings |
 | Logging | structlog |
-| Testing | pytest, pytest-asyncio, httpx, fakeredis, testcontainers |
+| Testing | pytest, pytest-asyncio, httpx |
 
 ## Security
 

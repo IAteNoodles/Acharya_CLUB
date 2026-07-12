@@ -5,7 +5,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def set_env():
-    os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/test")
+    os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./acharya_club.db")
     os.environ.setdefault("JWT_SECRET", "a" * 32)
     yield
 

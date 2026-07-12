@@ -14,10 +14,8 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import create_engine
-from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
-# Windows fix: asyncpg requires SelectorEventLoop (not ProactorEventLoop)
+# Windows fix: aiosqlite requires SelectorEventLoop (not ProactorEventLoop)
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -27,39 +25,19 @@ pytestmark = [
 ]
 
 
-CONTAINER_IMAGE_POSTGRES = "postgres:16-alpine"
-CONTAINER_IMAGE_REDIS = "redis:7-alpine"
-
-
-@pytest.fixture(scope="session")
-def postgres_container():
-    with PostgresContainer(CONTAINER_IMAGE_POSTGRES) as pg:
-        yield pg
-
-
-@pytest.fixture(scope="session")
-def redis_container():
-    with RedisContainer(CONTAINER_IMAGE_REDIS) as r:
-        yield r
-
-
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
-async def e2e_client(postgres_container, redis_container):
-    db_url = postgres_container.get_connection_url(driver="asyncpg")
-    redis_host = redis_container.get_container_host_ip()
-    redis_port = redis_container.get_exposed_port(6379)
-    redis_url = f"redis://{redis_host}:{redis_port}/0"
+async def e2e_client():
+    db_file = "e2e_test.db"
+    db_url = f"sqlite+aiosqlite:///./{db_file}"
 
     # Save original env vars for cleanup
     _saved = {k: os.environ.get(k) for k in ("DATABASE_URL", "REDIS_URL", "JWT_SECRET", "ENVIRONMENT", "DEBUG", "CORS_ORIGINS", "ASYNC_NULLPOOL")}
 
     os.environ["DATABASE_URL"] = db_url
-    os.environ["REDIS_URL"] = redis_url
     os.environ["JWT_SECRET"] = "e2e-test-jwt-secret-at-least-32-chars"
     os.environ["ENVIRONMENT"] = "test"
     os.environ["DEBUG"] = "false"
     os.environ["CORS_ORIGINS"] = '["http://localhost:5173"]'
-    os.environ["ASYNC_NULLPOOL"] = "1"
 
     # Clean all app modules so they reimport with correct env vars
     for mod_name in list(sys.modules):
@@ -79,23 +57,25 @@ async def e2e_client(postgres_container, redis_container):
     import app.models.notification  # noqa: F401
 
     # Use sync engine for DB setup
-    sync_url = db_url.replace("+asyncpg", "")
+    sync_url = f"sqlite:///./{db_file}"
     sync_engine = create_engine(sync_url)
     Base.metadata.create_all(sync_engine)
 
     from app.core.security import hash_password
     from app.models.user import User as UserModel, Role, UserStatus
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
     with sync_engine.begin() as conn:
-        stmt = pg_insert(UserModel.__table__).values(
-            id=uuid.uuid4(),
-            name="E2E Admin",
-            email="admin@college.edu",
-            password_hash=hash_password("AdminPass123"),
-            role=Role.ADMIN,
-            status=UserStatus.ACTIVE,
-        ).on_conflict_do_nothing(index_elements=["email"])
-        conn.execute(stmt)
+        # For SQLite, we can't easily use on_conflict_do_nothing without newer SQLAlchemy + sqlite dialect support,
+        # but since the DB is fresh per run, a simple insert is fine.
+        conn.execute(
+            UserModel.__table__.insert().values(
+                id=uuid.uuid4(),
+                name="E2E Admin",
+                email="admin@college.edu",
+                password_hash=hash_password("AdminPass123"),
+                role=Role.ADMIN,
+                status=UserStatus.ACTIVE,
+            )
+        )
     sync_engine.dispose()
 
     from app.main import create_app
@@ -113,6 +93,13 @@ async def e2e_client(postgres_container, redis_container):
             os.environ.pop(k, None)
         else:
             os.environ[k] = v
+            
+    # Cleanup DB file
+    if os.path.exists(db_file):
+        try:
+            os.remove(db_file)
+        except OSError:
+            pass
 
 
 class TestE2EWorkflow:

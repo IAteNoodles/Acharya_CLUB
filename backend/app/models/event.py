@@ -2,9 +2,8 @@ import enum
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, Enum as SAEnum, Integer, ForeignKey, DateTime, Index
+from sqlalchemy import String, Text, Enum as SAEnum, Integer, ForeignKey, DateTime, Index, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import Base, TimestampMixin
 
 
@@ -38,8 +37,8 @@ class Event(TimestampMixin, Base):
     start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_registrations: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    coordinator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, default=None)
+    created_by: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    coordinator_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, default=None)
     creator: Mapped["User"] = relationship(back_populates="events_created", foreign_keys=[created_by])
     coordinator: Mapped["User"] = relationship(back_populates="events_coordinated", foreign_keys=[coordinator_id])
     registrations: Mapped[List["Registration"]] = relationship(back_populates="event")

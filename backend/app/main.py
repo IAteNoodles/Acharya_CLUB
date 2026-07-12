@@ -19,7 +19,7 @@ from app.core.config import get_settings
 from app.core.database import engine
 from app.core.exceptions import register_exception_handlers
 from app.core.logging_config import setup_logging
-from app.core.redis import get_redis, close_redis
+from app.models.base import Base
 from app.middleware.security import SecurityHeadersMiddleware
 from app.middleware.timeout import RequestTimeoutMiddleware
 
@@ -31,35 +31,16 @@ logger = setup_logging()
 async def lifespan(app: FastAPI):
     logger.info("Starting up application")
 
-    redis = await get_redis()
-    if redis:
-        logger.info("Redis client initialized — rate limiter will use Redis backend")
-    else:
-        logger.warning("Redis not configured — rate limiter will use in-memory fallback")
-
-    from app.middleware.rate_limit import get_rate_limiter
-    rate_limit_check = await get_rate_limiter(
-        max_requests=100,
-        window_seconds=60,
-    )
-    rate_limit_auth_check = await get_rate_limiter(
-        max_requests=20,
-        window_seconds=60,
-    )
-    app.state.rate_limit_check = rate_limit_check
-    app.state.rate_limit_auth_check = rate_limit_auth_check
-    logger.info("Rate limiter initialized (general: 100/min, auth: 20/min)")
-
     try:
         async with engine.connect() as conn:
-            await conn.run_sync(lambda sync_conn: None)
+            await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database schema created successfully (if it didn't exist)")
     except Exception as exc:
-        logger.warning("Database connection check failed at startup", error=str(exc))
+        logger.warning("Database connection/schema check failed at startup", error=str(exc))
 
     yield
 
     logger.info("Shutting down application")
-    await close_redis()
     await engine.dispose()
     logger.info("Graceful shutdown complete")
 
@@ -127,31 +108,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
-    @app.middleware("http")
-    async def rate_limit_middleware(request: Request, call_next):
-        path = request.url.path
-        is_auth = path.startswith(settings.API_PREFIX + "/auth")
-        rate_limit_check = getattr(
-            request.app.state,
-            "rate_limit_auth_check" if is_auth else "rate_limit_check",
-            None,
-        )
-        if rate_limit_check and not path.startswith(settings.API_PREFIX + "/health"):
-            try:
-                await rate_limit_check(request)
-            except HTTPException as exc:
-                return JSONResponse(
-                    status_code=exc.status_code,
-                    content={
-                        "success": False,
-                        "error": {
-                            "code": "RATE_LIMITED",
-                            "message": exc.detail,
-                        },
-                    },
-                    headers=getattr(exc, "headers", None),
-                )
-        return await call_next(request)
+
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):

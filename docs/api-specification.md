@@ -141,7 +141,7 @@ async def get_me(
 
 **Refresh token rotation breach detection:** If a rotated-out refresh token is ever reused, all refresh tokens for that user are revoked.
 
-**Token blacklist:** On logout, the access token's `jti` is added to Redis with a TTL matching its remaining validity. Every authenticated request checks the blacklist.
+**Token blacklist:** On logout, the access token's `jti` is added to an in-memory blacklist matching its remaining validity. Every authenticated request checks the blacklist.
 
 ---
 
@@ -240,9 +240,9 @@ async def list_events(
 
 | Scope | Limit | Backend |
 |---|---|---|
-| Authentication (login, signup) | 10 attempts / 15 min / IP | Redis sliding window |
-| General API | 100 requests / 1 min / IP | Redis sliding window |
-| Attendance marking | 30 requests / 1 min / user | Redis sliding window |
+| Authentication (login, signup) | 10 attempts / 15 min / IP | In-memory (development) |
+| General API | 100 requests / 1 min / IP | In-memory (development) |
+| Attendance marking | 30 requests / 1 min / user | In-memory (development) |
 
 **Headers returned on every response:**
 
@@ -2266,40 +2266,35 @@ class AttendanceResponse(BaseModel):
 | Header | Description |
 |---|---|
 | `X-Request-ID` | Server-generated request correlation ID (UUIDv4) |
-| `X-RateLimit-Limit` | Max requests allowed in current window |
-| `X-RateLimit-Remaining` | Requests remaining in current window |
-| `X-RateLimit-Reset` | Unix timestamp when window resets |
 
 ---
 
-## 15. Health Check Endpoints (Not under `/api/v1`)
+## 15. Health Check Endpoint
 
 | Endpoint | Purpose | Checks |
 |---|---|---|
-| `GET /health` | Liveness probe | Returns `200 OK` immediately |
-| `GET /health/ready` | Readiness probe | Pings PostgreSQL (`SELECT 1`), Redis (`PING`); returns `200` only if both respond |
+| `GET /api/v1/health` | Liveness probe | Returns `200 OK` with uptime and timestamp |
 
-These endpoints are **not** rate-limited and **not** authenticated.
+This endpoint is unauthenticated.
 
 ```python
+import time
+from datetime import datetime, timezone
 from fastapi import APIRouter
-from app.core.health import check_db, check_redis
 
-health_router = APIRouter(tags=["health"])
+router = APIRouter()
+_start_time: float = time.time()
 
-
-@health_router.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@health_router.get("/health/ready")
-async def readiness():
-    db_ok = await check_db()
-    redis_ok = await check_redis()
-    if db_ok and redis_ok:
-        return {"status": "ok", "database": "up", "redis": "up"}
-    return {"status": "degraded", "database": "up" if db_ok else "down", "redis": "up" if redis_ok else "down"}
+@router.get("/health")
+async def health_check():
+    return {
+        "success": True,
+        "data": {
+            "status": "ok",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "uptime": time.time() - _start_time,
+        },
+    }
 ```
 
 ---
@@ -2311,7 +2306,7 @@ async def readiness():
 | `POST` | `/api/v1/auth/signup` | — | — | Register student or teacher |
 | `POST` | `/api/v1/auth/login` | — | — | Login with email and password |
 | `POST` | `/api/v1/auth/refresh` | — | — | Refresh access token |
-| `POST` | `/api/v1/auth/logout` | Required | Any | Logout and blacklist tokens |
+| `POST` | `/api/v1/auth/logout` | Required | Any | Logout and invalidate tokens |
 | `GET` | `/api/v1/auth/me` | Required | Any | Get current user profile |
 | `GET` | `/api/v1/users/pending-teachers` | Required | Admin | List pending teachers |
 | `PATCH` | `/api/v1/users/{id}/approve` | Required | Admin | Approve teacher account |
@@ -2321,20 +2316,18 @@ async def readiness():
 | `POST` | `/api/v1/events` | Required | Student/Teacher/Admin | Create event |
 | `GET` | `/api/v1/events/{id}` | Required | Any | Get event details |
 | `PATCH` | `/api/v1/events/{id}` | Required | Creator/Admin | Update event |
-| `PATCH` | `/api/v1/events/{id}/approve` | Required | Admin/Coordinator | Approve event |
-| `PATCH` | `/api/v1/events/{id}/reject` | Required | Admin/Coordinator | Reject event |
+| `PATCH` | `/api/v1/events/{id}/approve` | Required | Admin | Approve event |
+| `PATCH` | `/api/v1/events/{id}/reject` | Required | Admin | Reject event |
 | `PATCH` | `/api/v1/events/{id}/assign-coordinator` | Required | Admin | Assign teacher coordinator |
-| `POST` | `/api/v1/events/{id}/brochure` | Required | Student (creator) | Get brochure upload URL |
 | `POST` | `/api/v1/registrations` | Required | Student | Register for event |
 | `GET` | `/api/v1/registrations/my` | Required | Student | List own registrations |
-| `GET` | `/api/v1/registrations/event/{eventId}` | Required | Admin/Coordinator | List event registrations |
+| `GET` | `/api/v1/registrations/event/{event_id}` | Required | Admin/Coordinator | List event registrations |
 | `PATCH` | `/api/v1/registrations/{id}/accept` | Required | Admin/Coordinator | Accept registration |
 | `PATCH` | `/api/v1/registrations/{id}/reject` | Required | Admin/Coordinator | Reject registration |
-| `POST` | `/api/v1/registrations/{id}/proof` | Required | Student (owner) | Get proof upload URL |
-| `POST` | `/api/v1/attendance/mark` | Required | Coordinator | Mark single attendance |
 | `POST` | `/api/v1/attendance/bulk` | Required | Coordinator | Bulk mark attendance |
-| `GET` | `/api/v1/attendance/event/{eventId}` | Required | Admin/Coordinator | Get attendance sheet |
-| `GET` | `/api/v1/attendance/student/{studentId}` | Required | Student (own)/Admin | Get student attendance |
+| `GET` | `/api/v1/attendance/event/{event_id}` | Required | Admin/Coordinator | Get attendance sheet |
+| `GET` | `/api/v1/attendance/my` | Required | Student | Get student own attendance |
+| `GET` | `/api/v1/attendance/student/{student_id}` | Required | Admin | Get student attendance |
 
 ---
 
@@ -2367,18 +2360,12 @@ app.add_middleware(
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `HOST` | No | `0.0.0.0` | HTTP server bind address |
-| `PORT` | No | `8000` | HTTP server port |
-| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
-| `REDIS_URL` | Yes | — | Redis connection string |
-| `JWT_SECRET` | Yes | — | Symmetric key for signing JWTs (min 32 chars) |
-| `JWT_ACCESS_EXPIRY` | No | `15` | Access token expiry in minutes |
-| `JWT_REFRESH_EXPIRY` | No | `10080` | Refresh token expiry in minutes (7 days) |
-| `CORS_ORIGINS` | Yes | — | Comma-separated allowed origins |
-| `RATE_LIMIT_WINDOW_MS` | No | `60000` | Rate limit window in ms |
-| `RATE_LIMIT_MAX` | No | `100` | Max requests per window per IP |
-| `S3_BUCKET` | Yes | — | S3 bucket name for file uploads |
-| `S3_REGION` | Yes | — | AWS region |
-| `S3_ACCESS_KEY` | Yes | — | AWS access key |
-| `S3_SECRET_KEY` | Yes | — | AWS secret key |
+| `ENVIRONMENT` | No | `development` | Deployment environment |
+| `DEBUG` | No | `true` | Debug flag |
+| `DATABASE_URL` | No | `sqlite+aiosqlite:///./acharya_club.db` | SQLite connection string |
+| `JWT_SECRET` | No | (auto-generated in dev) | Symmetric key for signing JWTs (min 32 chars) |
+| `JWT_ALGORITHM` | No | `HS256` | JWT signature algorithm |
+| `JWT_ACCESS_EXPIRE_MINUTES` | No | `15` | Access token expiry in minutes |
+| `JWT_REFRESH_EXPIRE_DAYS` | No | `7` | Refresh token expiry in days |
+| `CORS_ORIGINS` | No | `http://localhost:5173,http://localhost:8000` | Comma-separated allowed origins |
 | `LOG_LEVEL` | No | `INFO` | Python logging level |

@@ -5,9 +5,6 @@ import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.pool import NullPool
-from testcontainers.postgres import PostgresContainer
-
 from app.models.user import User, Role, UserStatus
 from app.models.base import Base
 
@@ -18,19 +15,8 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture(scope="session")
-def postgres_container():
-    """Start an ephemeral Postgres container for the test session."""
-    with PostgresContainer("postgres:16-alpine") as pg:
-        yield pg
-
-
-@pytest.fixture(scope="session")
-def async_engine(postgres_container):
-    # Build asyncpg URL from the container's sync URL
-    sync_url = postgres_container.get_connection_url()
-    db_url = sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://").replace(
-        "postgresql://", "postgresql+asyncpg://"
-    )
+def async_engine():
+    db_url = "sqlite+aiosqlite:///:memory:"
 
     import app.models.user  # noqa: F401
     import app.models.event  # noqa: F401
@@ -41,8 +27,6 @@ def async_engine(postgres_container):
     engine = create_async_engine(
         db_url,
         echo=False,
-        poolclass=NullPool,
-        connect_args={"statement_cache_size": 0},
     )
 
     async def _bootstrap():

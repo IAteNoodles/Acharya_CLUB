@@ -1,11 +1,5 @@
 # Acharya_CLUB — College Event Management System
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.138+-00a86b)](https://fastapi.tiangolo.com)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://postgresql.org)
-[![Docker](https://img.shields.io/badge/Docker-Multi--stage-2496ED)](https://docker.com)
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF)](.github/workflows/ci.yml)
-
 A production-grade REST API that digitises the full lifecycle of college events — from proposal and approval through registration, attendance tracking, in-app notifications, and reporting. Built as a modular monolith with a 3-role RBAC hierarchy (Student / Teacher / Admin) and designed for single-college deployments.
 
 ---
@@ -17,16 +11,12 @@ A production-grade REST API that digitises the full lifecycle of college events 
 | Runtime | Python 3.12+ |
 | Web Framework | FastAPI 0.138+ |
 | ASGI Server | Uvicorn 0.34 |
-| ORM | SQLAlchemy 2.0 (async via asyncpg) |
-| Database | PostgreSQL 16 (Supabase) |
-| Cache / Rate Limiting | Redis / Upstash Redis |
+| ORM | SQLAlchemy 2.0 (async via aiosqlite) |
+| Database | SQLite |
 | Auth | PyJWT (HS256) + bcrypt |
-| Migrations | Alembic |
 | Validation | Pydantic v2 / pydantic-settings |
 | Logging | structlog (structured JSON) |
-| Containerisation | Docker multi-stage (Alpine-based) |
-| CI/CD | GitHub Actions |
-| Testing | pytest 9.1+, pytest-asyncio, httpx, fakeredis, testcontainers |
+| Testing | pytest 9.1+, pytest-asyncio, httpx |
 
 ---
 
@@ -50,12 +40,11 @@ A production-grade REST API that digitises the full lifecycle of college events 
 ```
 
 - **Modular monolith** — cleanly separated layers for future extraction if needed
-- **Async-first** — FastAPI + asyncpg + SQLAlchemy 2.0 async sessions throughout
+- **Async-first** — FastAPI + aiosqlite + SQLAlchemy 2.0 async sessions throughout
 - **3-role RBAC** — Student (browse/register, create out-college events), Teacher (coordinate/mark, approve out-college events), Admin (full control, create in-college events)
 - **JWT with rotation** — 15-min access tokens, 7-day refresh tokens with rotation
 - **In-app notifications** — 6 notification types auto-created on state changes
 - **Structured logging** — structlog outputs ISO-timestamped JSON
-- **Redis rate limiting** — sliding-window via Redis sorted sets, with in-memory fallback
 
 ---
 
@@ -64,58 +53,20 @@ A production-grade REST API that digitises the full lifecycle of college events 
 ### Prerequisites
 
 - Python 3.12+
-- PostgreSQL 16 (or Docker)
-- Redis 7 (optional, for production rate limiting)
 
 ### Local Development
 
 ```bash
-# Clone the project
 git clone <repo-url>
-cd Acharya_CLUB
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate    # Linux/Mac
-.venv\Scripts\activate       # Windows
-
-# Change to the backend directory where the code lives
-cd backend
-
-# Install dependencies
+cd Acharya_CLUB/backend
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your DB credentials and a strong JWT_SECRET
-
-# Run migrations (must be in the backend directory)
-alembic upgrade head
-
-# Seed sample data (optional, must be in the backend directory)
-python scripts/seed.py
-
-# Start the server
-uvicorn app.main:create_app --factory --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:create_app --factory --reload
 ```
+
+No `.env` required (sane in-code defaults), no Docker, no external DB signup, no Redis, no CI. One file (`acharya_club.db`) holds all state. Tests run the same way, no containers.
 
 The API will be available at `http://localhost:8000/api/v1`. Interactive docs at `http://localhost:8000/api/v1/docs`.
-
-### Docker Development
-
-```bash
-# Start all services with local Postgres and Redis
-docker compose --profile local-db up
-
-# Start app only (expects external Postgres/Redis)
-docker compose up
-```
-
-### Production Deployment
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
 
 ---
 
@@ -123,30 +74,22 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 ```
 Acharya_CLUB/
-├── .github/workflows/ci.yml        # CI pipeline
 ├── docs/                            # Design documents & specs
 │   ├── architecture.md
 │   ├── api-specification.md
-│   ├── database-schema.md
-│   └── redis-plan.md
+│   └── database-schema.md
 └── backend/
     ├── .env.example                 # Environment template
     ├── requirements.txt             # Pinned dependencies
     ├── pyproject.toml               # Project metadata & pytest config
-    ├── Dockerfile                   # Multi-stage build
-    ├── docker-compose.yml           # Dev stack
-    ├── docker-compose.prod.yml      # Production overrides
-    ├── alembic.ini / alembic/       # Database migrations
     ├── scripts/
-    │   ├── seed.py                  # Data seeder
-    │   └── entrypoint.sh            # Docker entrypoint
+    │   └── seed.py                  # Data seeder
     ├── app/
     │   ├── main.py                  # FastAPI app factory (create_app)
     │   ├── core/                    # Infrastructure
     │   │   ├── config.py            # pydantic-settings
     │   │   ├── database.py          # Async engine + session
     │   │   ├── security.py          # JWT + bcrypt
-    │   │   ├── redis.py             # Redis singleton
     │   │   ├── exceptions.py        # AppHTTPException hierarchy
     │   │   └── logging_config.py    # structlog setup
     │   ├── models/                  # SQLAlchemy 2.0 models
@@ -172,10 +115,7 @@ Acharya_CLUB/
     └── tests/
         ├── conftest.py
         ├── test_*.py                # 21 unit/mock test files
-        ├── test_e2e_workflows.py    # Full E2E tests
-        └── real_db/                 # Real PostgreSQL tests
-            ├── conftest.py
-            └── test_*.py            # 7 real DB test files
+        └── test_e2e_workflows.py    # Full E2E tests
 ```
 
 ---
@@ -277,18 +217,12 @@ Three-layer testing strategy with 29 test files:
 | Layer | Approach | Dependencies | Speed |
 |---|---|---|---|
 | **Unit / Mock** | `AsyncMock`, `dependency_overrides`, `httpx.AsyncClient`+`ASGITransport` | None | Fast (~1-2s) |
-| **Real DB** | `testcontainers.PostgresContainer`, rollback-per-test | Docker | Moderate (~5-10s) |
-| **E2E** | `PostgresContainer` + `RedisContainer`, full lifecycle | Docker (both) | Slow (~20-30s) |
+| **Real DB** | `aiosqlite`, in-memory/temp files | None | Fast (~2-3s) |
+| **E2E** | SQLite file db, full lifecycle | None | Moderate (~5-10s) |
 
 ```bash
-# Default: unit/mock tests only (no Docker required)
+# Run all tests
 pytest -v
-
-# Real DB tests (requires Docker)
-pytest -v tests/real_db/
-
-# All tests including E2E (requires Docker)
-pytest -v -m ""
 
 # With coverage
 pytest --cov=app --cov-report=term-missing
@@ -304,35 +238,19 @@ All configuration via environment variables (or `.env` file) using pydantic-sett
 
 | Variable | Description |
 |---|---|
-| `JWT_SECRET` | HMAC key for JWT (min 32 characters) |
-| `DB_PASSWORD` | Database password (or set `DATABASE_URL` directly) |
+| None | All variables have defaults |
 
 ### Key Optional
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | computed | Full asyncpg connection string |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis URL |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./acharya_club.db` | Database string |
+| `JWT_SECRET` | Auto-generated | HMAC key for JWT (min 32 chars) |
 | `JWT_ACCESS_EXPIRE_MINUTES` | 15 | Access token lifetime |
 | `JWT_REFRESH_EXPIRE_DAYS` | 7 | Refresh token lifetime |
 | `CORS_ORIGINS` | localhost:5173,8000 | Allowed CORS origins |
 | `LOG_LEVEL` | INFO | Log level |
 | `REQUEST_TIMEOUT_SECONDS` | 30 | Request timeout |
-| `DATABASE_POOL_SIZE` | 5 | Connection pool size |
-
----
-
-## Docker
-
-Multi-stage Dockerfile (Alpine-based):
-
-| Stage | Base | Purpose |
-|---|---|---|
-| `builder` | `python:3.13-alpine` | Compile dependencies |
-| `development` | From builder | Hot-reload with volume mount, health check |
-| `production` | From builder | Stripped runtime, auto-migrations, non-root user |
-
-Entrypoint auto-runs `alembic upgrade head` before starting the server.
 
 ---
 

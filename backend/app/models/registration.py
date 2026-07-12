@@ -1,9 +1,8 @@
 import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import Enum as SAEnum, ForeignKey, UniqueConstraint, Index, DateTime, func
+from sqlalchemy import Enum as SAEnum, ForeignKey, UniqueConstraint, Index, DateTime, func, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import Base, TimestampMixin
 
 
@@ -21,8 +20,8 @@ class RegistrationStatus(str, enum.Enum):
 class Registration(TimestampMixin, Base):
     __tablename__ = "registrations"
 
-    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
-    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    event_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("events.id"), nullable=False)
+    student_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role_type: Mapped[RegistrationRole] = mapped_column(SAEnum(RegistrationRole, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     status: Mapped[RegistrationStatus] = mapped_column(SAEnum(RegistrationStatus, values_callable=lambda obj: [e.value for e in obj]), default=RegistrationStatus.PENDING, nullable=False)
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

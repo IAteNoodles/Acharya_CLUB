@@ -1,7 +1,6 @@
 import secrets
 import warnings
 from typing import List, Annotated
-from urllib.parse import quote
 
 from pydantic import model_validator, BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,18 +22,8 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # Database — set DATABASE_URL or DB_PASSWORD in .env
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:localdev@localhost:5432/acharya"
-    DB_USER: str = "postgres.qwouxrnnwmkotkwraqme"
-    DB_PASSWORD: str = ""
-    DB_HOST: str = "aws-1-ap-northeast-1.pooler.supabase.com"
-    DB_PORT: int = 5432
-    DB_NAME: str = "postgres"
-    DATABASE_POOL_SIZE: int = 5
-    DATABASE_MAX_OVERFLOW: int = 3
-
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # Database
+    DATABASE_URL: str = "sqlite+aiosqlite:///./acharya_club.db"
 
     # JWT — auto-generated random secret in development if not provided
     JWT_SECRET: str = ""
@@ -54,27 +43,6 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
-    @model_validator(mode="after")
-    def ensure_database_url(self):
-        if not self.DATABASE_URL:
-            if self.DB_PASSWORD:
-                encoded = quote(self.DB_PASSWORD, safe="")
-                self.DATABASE_URL = (
-                    f"postgresql+asyncpg://{self.DB_USER}:{encoded}"
-                    f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?ssl=require"
-                )
-            else:
-                if self.ENVIRONMENT == "development":
-                    warnings.warn(
-                        "DATABASE_URL and DB_PASSWORD are not set. "
-                        "App may fail to connect to database."
-                    )
-                else:
-                    raise ValueError(
-                        "Either DATABASE_URL must be set or DB_PASSWORD must be provided "
-                        "as an environment variable"
-                    )
-        return self
 
     @model_validator(mode="after")
     def enforce_jwt_secret(self):

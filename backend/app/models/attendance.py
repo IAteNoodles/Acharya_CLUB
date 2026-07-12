@@ -1,9 +1,8 @@
 import enum
 import uuid
 from datetime import date, datetime
-from sqlalchemy import Enum as SAEnum, ForeignKey, Date, UniqueConstraint, Index, DateTime, func
+from sqlalchemy import Enum as SAEnum, ForeignKey, Date, UniqueConstraint, Index, DateTime, func, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import Base, TimestampMixin
 
 
@@ -15,9 +14,9 @@ class AttendanceStatus(str, enum.Enum):
 class Attendance(TimestampMixin, Base):
     __tablename__ = "attendance"
 
-    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
-    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    marked_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    event_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("events.id"), nullable=False)
+    student_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    marked_by: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     attendance_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[AttendanceStatus] = mapped_column(SAEnum(AttendanceStatus, values_callable=lambda obj: [e.value for e in obj]), default=AttendanceStatus.PRESENT, nullable=False)
     marked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

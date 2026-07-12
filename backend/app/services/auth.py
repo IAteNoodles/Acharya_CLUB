@@ -6,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.redis import get_redis
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -25,24 +24,10 @@ _BLACKLIST_PREFIX = "bl:"
 
 
 async def _is_blacklisted(token: str) -> bool:
-    redis = await get_redis()
-    if redis is not None:
-        try:
-            exists = await redis.get(_BLACKLIST_PREFIX + token)
-            return exists is not None
-        except Exception:
-            logger.warning("Redis check failed, falling back to in-memory blacklist")
     return token in _blacklisted_tokens_fallback
 
 
 async def _add_to_blacklist(token: str, ttl_seconds: int) -> None:
-    redis = await get_redis()
-    if redis is not None:
-        try:
-            await redis.setex(_BLACKLIST_PREFIX + token, ttl_seconds, "1")
-            return
-        except Exception:
-            logger.warning("Redis set failed, falling back to in-memory blacklist")
     _blacklisted_tokens_fallback.add(token)
 
 

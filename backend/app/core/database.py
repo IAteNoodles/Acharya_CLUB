@@ -5,23 +5,23 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
+from sqlalchemy import event
 
 from app.core.config import get_settings
 
 settings = get_settings()
 
-engine_kwargs = {"echo": settings.DEBUG}
-if os.environ.get("ASYNC_NULLPOOL") == "1":
-    engine_kwargs["poolclass"] = NullPool
-else:
-    engine_kwargs["pool_size"] = settings.DATABASE_POOL_SIZE
-    engine_kwargs["max_overflow"] = settings.DATABASE_MAX_OVERFLOW
-
 engine = create_async_engine(
     settings.DATABASE_URL,
-    **engine_kwargs
+    echo=settings.DEBUG,
 )
+
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
 
 async_session_factory = async_sessionmaker(
     engine,
