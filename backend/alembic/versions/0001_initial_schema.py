@@ -67,7 +67,7 @@ def upgrade() -> None:
         sa.Column("end_date", sa.DateTime(timezone=True), nullable=False),
         sa.Column("max_registrations", sa.Integer, nullable=False, server_default="0"),
         sa.Column("created_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("coordinator_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("coordinator_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
     )
     op.create_index("events_status_type_idx", "events", ["status", "event_type"])
     op.create_index("events_coordinator_id_idx", "events", ["coordinator_id"])

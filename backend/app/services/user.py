@@ -53,11 +53,11 @@ async def _get_teacher_user(db: AsyncSession, user_id: str):
     from app.models.user import User
 
     try:
-        uuid.UUID(user_id)
+        uid = uuid.UUID(user_id)
     except ValueError:
         return None
 
-    stmt = select(User).where(User.id == user_id)
+    stmt = select(User).where(User.id == uid)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 

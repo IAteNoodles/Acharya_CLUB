@@ -66,8 +66,9 @@ class RegistrationService:
         page: int = 1,
         limit: int = 20,
     ) -> tuple[list[Registration], int]:
-        stmt = select(Registration).where(Registration.student_id == student_id)
-        count_stmt = select(func.count()).select_from(Registration).where(Registration.student_id == student_id)
+        uid = uuid.UUID(student_id)
+        stmt = select(Registration).where(Registration.student_id == uid)
+        count_stmt = select(func.count()).select_from(Registration).where(Registration.student_id == uid)
 
         if status_filter:
             stmt = stmt.where(Registration.status == status_filter)

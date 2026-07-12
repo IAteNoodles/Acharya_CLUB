@@ -11,6 +11,7 @@ redis[hiredis]>=5.2.1
 structlog>=24.4.0
 upstash-redis>=1.7.0
 python-multipart>=0.0.19
+passlib>=1.7.4
 
 # ── Dev ──────────────────────────────────────────────
 pytest>=8.3.4

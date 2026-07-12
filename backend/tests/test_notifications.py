@@ -41,7 +41,7 @@ class TestNotificationService:
         )
 
         db.add.assert_called_once()
-        db.commit.assert_called_once()
+        db.flush.assert_called_once()
         assert notif.user_id == USER_ID
         assert notif.type == "registration_accepted"
 
@@ -199,7 +199,7 @@ class TestNotificationAPI:
         from app.api.deps import get_current_user
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
         app.dependency_overrides[get_current_user] = lambda: self.student_user
 
         from app.services.notification import NotificationService
@@ -233,7 +233,7 @@ class TestNotificationAPI:
         from app.api.deps import get_current_user
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
         app.dependency_overrides[get_current_user] = lambda: self.student_user
 
         from app.services.notification import NotificationService
@@ -252,7 +252,7 @@ class TestNotificationAPI:
         from app.api.deps import get_current_user
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
         app.dependency_overrides[get_current_user] = lambda: self.student_user
 
         from app.services.notification import NotificationService
@@ -272,7 +272,7 @@ class TestNotificationAPI:
         from app.api.deps import get_current_user
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
         app.dependency_overrides[get_current_user] = lambda: self.student_user
 
         from app.services.notification import NotificationService
@@ -304,7 +304,7 @@ class TestNotificationAPI:
         from app.core.exceptions import NotFoundException, register_exception_handlers
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
         register_exception_handlers(app)
         app.dependency_overrides[get_current_user] = lambda: self.student_user
 
@@ -324,7 +324,7 @@ class TestNotificationAPI:
         from app.api.deps import get_current_user
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
         app.dependency_overrides[get_current_user] = lambda: self.student_user
 
         from app.services.notification import NotificationService
@@ -343,7 +343,7 @@ class TestNotificationAPI:
         from app.api.v1.notifications import router
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -357,7 +357,7 @@ class TestNotificationAPI:
         from app.api.v1.notifications import router
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/notifications")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

@@ -129,7 +129,7 @@ class TestAuthAPI:
         from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/auth")
         register_exception_handlers(app)
 
         async def mock_user():

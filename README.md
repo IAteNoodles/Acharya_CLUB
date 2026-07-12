@@ -51,7 +51,7 @@ A production-grade REST API that digitises the full lifecycle of college events 
 
 - **Modular monolith** — cleanly separated layers for future extraction if needed
 - **Async-first** — FastAPI + asyncpg + SQLAlchemy 2.0 async sessions throughout
-- **3-role RBAC** — Student (browse/register), Teacher (coordinate/mark), Admin (full control)
+- **3-role RBAC** — Student (browse/register, create out-college events), Teacher (coordinate/mark, approve out-college events), Admin (full control, create in-college events)
 - **JWT with rotation** — 15-min access tokens, 7-day refresh tokens with rotation
 - **In-app notifications** — 6 notification types auto-created on state changes
 - **Structured logging** — structlog outputs ISO-timestamped JSON
@@ -70,14 +70,17 @@ A production-grade REST API that digitises the full lifecycle of college events 
 ### Local Development
 
 ```bash
-# Clone and enter the project
+# Clone the project
 git clone <repo-url>
-cd Acharya_CLUB/backend
+cd Acharya_CLUB
 
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate    # Linux/Mac
 .venv\Scripts\activate       # Windows
+
+# Change to the backend directory where the code lives
+cd backend
 
 # Install dependencies
 pip install -r requirements.txt
@@ -86,10 +89,10 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your DB credentials and a strong JWT_SECRET
 
-# Run migrations
+# Run migrations (must be in the backend directory)
 alembic upgrade head
 
-# Seed sample data (optional)
+# Seed sample data (optional, must be in the backend directory)
 python scripts/seed.py
 
 # Start the server

@@ -370,7 +370,7 @@ def coordinator_app():
     from app.api import deps
 
     app = FastAPI()
-    app.include_router(router)
+    app.include_router(router, prefix="/api/v1/attendance")
     register_exception_handlers(app)
 
     async def mock_user():
@@ -388,7 +388,7 @@ def admin_att_app():
     from app.api import deps
 
     app = FastAPI()
-    app.include_router(router)
+    app.include_router(router, prefix="/api/v1/attendance")
     register_exception_handlers(app)
 
     async def mock_user():
@@ -406,7 +406,7 @@ def student_att_app():
     from app.api import deps
 
     app = FastAPI()
-    app.include_router(router)
+    app.include_router(router, prefix="/api/v1/attendance")
     register_exception_handlers(app)
 
     async def mock_user():
@@ -565,7 +565,7 @@ class TestAttendanceAPI:
         from app.api.v1.attendance import router
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/attendance")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

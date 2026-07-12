@@ -18,7 +18,7 @@ from app.schemas.attendance import (
 )
 from app.services.attendance import AttendanceService
 
-router = APIRouter(prefix="/api/v1/attendance", tags=["Attendance"])
+router = APIRouter(tags=["Attendance"])
 
 
 @router.post("/bulk")

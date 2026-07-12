@@ -6,7 +6,7 @@ from jwt import InvalidTokenError
 
 from app.core.config import settings
 
-ALGORITHM = "HS256"
+
 
 
 def create_access_token(user_id: str, role: str, expires_delta: timedelta | None = None) -> str:
@@ -20,7 +20,7 @@ def create_access_token(user_id: str, role: str, expires_delta: timedelta | None
         "iat": now,
         "exp": now + expires_delta,
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=ALGORITHM)
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
 def create_refresh_token(user_id: str, expires_delta: timedelta | None = None) -> str:
@@ -33,7 +33,7 @@ def create_refresh_token(user_id: str, expires_delta: timedelta | None = None) -
         "iat": now,
         "exp": now + expires_delta,
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=ALGORITHM)
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
 def verify_token(token: str) -> dict:
@@ -41,7 +41,7 @@ def verify_token(token: str) -> dict:
         payload = jwt.decode(
             token,
             settings.JWT_SECRET,
-            algorithms=[ALGORITHM],
+            algorithms=[settings.JWT_ALGORITHM],
             options={"require": ["exp"], "verify_aud": False},
         )
         return payload

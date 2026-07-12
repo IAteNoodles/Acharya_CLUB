@@ -64,7 +64,7 @@ class NotificationService:
             related_entity_id=entity_id,
         )
         db.add(notif)
-        await db.commit()
+        await db.flush()
         await db.refresh(notif)
         return notif
 

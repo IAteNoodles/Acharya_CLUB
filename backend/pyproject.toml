@@ -2,7 +2,7 @@
 name = "acharya-club-backend"
 version = "1.0.0"
 description = "Acharya_CLUB - College Event Management System Backend"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.138.0,<0.139.0",
     "uvicorn[standard]==0.34.0",
@@ -16,6 +16,7 @@ dependencies = [
     "structlog>=24.4.0",
     "upstash-redis>=1.7.0",
     "python-multipart>=0.0.19",
+    "passlib>=1.7.4",
 ]
 
 [build-system]

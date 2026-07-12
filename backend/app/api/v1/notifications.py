@@ -7,7 +7,7 @@ from app.schemas.common import SuccessResponse, PaginatedResponse, PaginatedMeta
 from app.schemas.notification import NotificationOut, UnreadCountResponse, MarkReadAllResponse
 from app.services.notification import NotificationService
 
-router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
+router = APIRouter(tags=["notifications"])
 
 
 @router.get("")

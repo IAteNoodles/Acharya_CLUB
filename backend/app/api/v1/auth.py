@@ -12,7 +12,7 @@ from app.schemas.auth import (
 from app.services import auth as auth_service
 from app.core.database import get_db
 
-router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
 
 
 @router.post("/signup", status_code=201)

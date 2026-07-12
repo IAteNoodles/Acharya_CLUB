@@ -257,9 +257,13 @@ class EventService:
         db: AsyncSession,
         event_id: str,
         coordinator_id: str,
+        user: dict,
     ) -> Event:
-        from app.core.exceptions import NotFoundException, ValidationException
+        from app.core.exceptions import NotFoundException, ValidationException, ForbiddenException
         from app.models.user import User
+
+        if user.get("role") != "admin":
+            raise ForbiddenException("Only admins can assign coordinators")
 
         event = await EventService.get_event_by_id(db, event_id)
 

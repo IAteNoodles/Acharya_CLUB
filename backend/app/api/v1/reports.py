@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.schemas.common import SuccessResponse
 from app.services.reports import ReportService
 
-router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
+router = APIRouter(tags=["reports"])
 
 
 @router.get("/dashboard")

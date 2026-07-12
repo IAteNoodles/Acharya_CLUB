@@ -67,7 +67,25 @@ async def get_rate_limiter(
         limiter = InMemoryRateLimiter()
 
     async def rate_limit_dependency(request: Request):
-        key = f"rl:{request.client.host}:{request.url.path}"
+        forwarded = request.headers.get("X-Forwarded-For")
+        ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+        
+        user_id = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                import jwt
+                payload = jwt.decode(token, options={"verify_signature": False})
+                user_id = payload.get("sub")
+            except Exception:
+                pass
+
+        if user_id:
+            key = f"rl:{user_id}:{request.url.path}"
+        else:
+            key = f"rl:{ip}:{request.url.path}"
+            
         allowed, retry_after = await limiter.check(key, max_requests, window_seconds)
         if not allowed:
             raise HTTPException(

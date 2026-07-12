@@ -88,7 +88,7 @@ class TestReportsAPI:
         from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/reports")
         register_exception_handlers(app)
         app.dependency_overrides[get_current_user] = lambda: {"sub": str(uuid.uuid4()), "role": "admin"}
 
@@ -123,7 +123,7 @@ class TestReportsAPI:
         from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/reports")
         register_exception_handlers(app)
         app.dependency_overrides[get_current_user] = lambda: {"sub": str(uuid.uuid4()), "role": "student"}
 
@@ -141,7 +141,7 @@ class TestReportsAPI:
         from app.api.deps import get_current_user
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/reports")
         app.dependency_overrides[get_current_user] = lambda: None
 
         from httpx import ASGITransport, AsyncClient

@@ -10,7 +10,6 @@ from app.models.base import Base, TimestampMixin
 class AttendanceStatus(str, enum.Enum):
     PRESENT = "present"
     ABSENT = "absent"
-    LATE = "late"
 
 
 class Attendance(TimestampMixin, Base):

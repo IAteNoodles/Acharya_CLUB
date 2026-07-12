@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.core.database import get_db
 from app.schemas.event import (
     EventCreate,
@@ -16,7 +16,7 @@ from app.schemas.event import (
 )
 from app.services.event import EventService
 
-router = APIRouter(prefix="/api/v1/events", tags=["events"])
+router = APIRouter(tags=["events"])
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -120,9 +120,9 @@ async def assign_coordinator(
     event_id: str,
     data: EventAssignCoordinator,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
-    event = await EventService.assign_coordinator(db, event_id, data.coordinator_id)
+    event = await EventService.assign_coordinator(db, event_id, data.coordinator_id, current_user)
     return _event_to_out(event)
 
 

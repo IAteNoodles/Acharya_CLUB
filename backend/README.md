@@ -7,7 +7,7 @@ Manage events, registrations, attendance, and in-app notifications with role-bas
 ## Features
 
 - **Role-based access** — Students, teachers, and admins with granular permissions per endpoint.
-- **Event lifecycle** — Create, approve, reject, assign coordinators, and filter by status/type/category.
+- **Event lifecycle** — Admins create in-college events, students create out-college events. Teachers can only act as coordinators (approving events and marking attendance), they do not create events.
 - **Registration system** — Students register as volunteers or participants; coordinators accept or reject.
 - **Attendance tracking** — Bulk mark attendance per event/date with present/absent/late status.
 - **Notification system** — In-app notifications for registration acceptance/rejection, event approval/rejection, and teacher approval/rejection.
@@ -46,10 +46,13 @@ The API follows a layered pattern: **routes → services → models**. Middlewar
 
 ```bash
 git clone <repo-url>
-cd backend
+cd Acharya_CLUB
+
 python -m venv .venv
 .venv\Scripts\activate     # Windows
 source .venv/bin/activate  # macOS/Linux
+
+cd backend
 pip install -r requirements.txt
 ```
 

@@ -182,7 +182,7 @@ class TestUserService:
         result = await approve_teacher(mock_session, "550e8400-e29b-41d4-a716-446655440011")
 
         assert result.status == "active"
-        assert mock_session.commit.await_count == 2
+        assert mock_session.commit.await_count == 1
 
     @pytest.mark.asyncio
     async def test_approve_teacher_not_found(self):
@@ -281,7 +281,7 @@ class TestUserService:
         result = await reject_teacher(mock_session, "550e8400-e29b-41d4-a716-446655440015")
 
         assert result.status == "rejected"
-        assert mock_session.commit.await_count == 2
+        assert mock_session.commit.await_count == 1
 
     @pytest.mark.asyncio
     async def test_reject_teacher_not_found(self):
@@ -371,7 +371,7 @@ class TestUsersAPI:
         from app.api import deps
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/users")
 
         async def mock_admin():
             return {"sub": "admin-uuid", "role": "admin"}
@@ -606,7 +606,7 @@ class TestUsersAPI:
         from app.api.v1.users import router
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/users")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -630,7 +630,7 @@ class TestUsersAPI:
         from app.api import deps
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/users")
 
         async def mock_student():
             return {"sub": "student-uuid", "role": "student"}

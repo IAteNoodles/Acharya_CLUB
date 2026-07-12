@@ -332,7 +332,7 @@ class TestEventService:
 
         with pytest.raises(NotFoundException, match="Coordinator user not found"):
             await EventService.assign_coordinator(
-                db, self.VALID_EVENT_ID, "550e8400-e29b-41d4-a716-446655440099",
+                db, self.VALID_EVENT_ID, "550e8400-e29b-41d4-a716-446655440099", {"role": "admin"}
             )
 
     @pytest.mark.asyncio
@@ -355,7 +355,7 @@ class TestEventService:
 
         with pytest.raises(ValidationException, match="must be a teacher"):
             await EventService.assign_coordinator(
-                db, self.VALID_EVENT_ID, "550e8400-e29b-41d4-a716-446655440098",
+                db, self.VALID_EVENT_ID, "550e8400-e29b-41d4-a716-446655440098", {"role": "admin"}
             )
 
     @pytest.mark.asyncio
@@ -378,7 +378,7 @@ class TestEventService:
 
         with pytest.raises(ValidationException, match="must have active status"):
             await EventService.assign_coordinator(
-                db, self.VALID_EVENT_ID, "550e8400-e29b-41d4-a716-446655440097",
+                db, self.VALID_EVENT_ID, "550e8400-e29b-41d4-a716-446655440097", {"role": "admin"}
             )
 
 
@@ -391,7 +391,7 @@ class TestEventsAPI:
         from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/events")
         register_exception_handlers(app)
 
         async def mock_admin():
@@ -666,7 +666,7 @@ class TestEventsAPI:
         from app.api.v1.events import router
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/events")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

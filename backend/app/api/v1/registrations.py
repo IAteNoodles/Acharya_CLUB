@@ -17,7 +17,7 @@ from app.schemas.registration import (
 )
 from app.services.registration import RegistrationService
 
-router = APIRouter(prefix="/api/v1/registrations", tags=["registrations"])
+router = APIRouter(tags=["registrations"])
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

@@ -1,9 +1,9 @@
 import secrets
 import warnings
-from typing import List
+from typing import List, Annotated
 from urllib.parse import quote
 
-from pydantic import model_validator
+from pydantic import model_validator, BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # Database — set DATABASE_URL or DB_PASSWORD in .env
-    DATABASE_URL: str = ""
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:localdev@localhost:5432/acharya"
     DB_USER: str = "postgres.qwouxrnnwmkotkwraqme"
     DB_PASSWORD: str = ""
     DB_HOST: str = "aws-1-ap-northeast-1.pooler.supabase.com"
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     REQUEST_TIMEOUT_SECONDS: int = 30
 
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:8000"]
+    CORS_ORIGINS: Annotated[List[str], BeforeValidator(lambda v: [i.strip() for i in v.split(",")] if isinstance(v, str) and not v.startswith("[") else v)] = ["http://localhost:5173", "http://localhost:8000"]
 
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -64,10 +64,16 @@ class Settings(BaseSettings):
                     f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?ssl=require"
                 )
             else:
-                raise ValueError(
-                    "Either DATABASE_URL must be set or DB_PASSWORD must be provided "
-                    "as an environment variable"
-                )
+                if self.ENVIRONMENT == "development":
+                    warnings.warn(
+                        "DATABASE_URL and DB_PASSWORD are not set. "
+                        "App may fail to connect to database."
+                    )
+                else:
+                    raise ValueError(
+                        "Either DATABASE_URL must be set or DB_PASSWORD must be provided "
+                        "as an environment variable"
+                    )
         return self
 
     @model_validator(mode="after")

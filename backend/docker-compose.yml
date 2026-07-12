@@ -10,12 +10,12 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEBUG=true
-      - CORS_ORIGINS=["http://localhost:5173","http://localhost:8000"]
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:8000
       # DB_PASSWORD and UPSTASH_REDIS_REST_TOKEN are read from .env or system env
     volumes:
       - .:/app
       - /app/__pycache__
-    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 --reload --proxy-headers
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8000/api/v1/health"]
       interval: 30s

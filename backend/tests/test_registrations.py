@@ -210,7 +210,7 @@ class TestRegistrationService:
         )
 
         assert reg.status == RegistrationStatus.ACCEPTED
-        assert db.commit.call_count == 2
+        assert db.commit.call_count == 1
         assert db.refresh.call_count == 2
 
     @pytest.mark.asyncio
@@ -383,7 +383,7 @@ def student_app():
     from app.core.exceptions import register_exception_handlers
 
     app = FastAPI()
-    app.include_router(router)
+    app.include_router(router, prefix="/api/v1/registrations")
     register_exception_handlers(app)
 
     async def mock_user():
@@ -400,7 +400,7 @@ def teacher_app():
     from app.core.exceptions import register_exception_handlers
 
     app = FastAPI()
-    app.include_router(router)
+    app.include_router(router, prefix="/api/v1/registrations")
     register_exception_handlers(app)
 
     async def mock_user():
@@ -566,7 +566,7 @@ class TestRegistrationsAPI:
         from app.api.v1.registrations import router
 
         app = FastAPI()
-        app.include_router(router)
+        app.include_router(router, prefix="/api/v1/registrations")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

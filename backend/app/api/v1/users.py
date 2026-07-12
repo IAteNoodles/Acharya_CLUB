@@ -9,7 +9,7 @@ from app.schemas.users import (
 )
 from app.services import user as user_service
 
-router = APIRouter(prefix="/api/v1/users", tags=["users"])
+router = APIRouter(tags=["users"])
 
 
 @router.get(

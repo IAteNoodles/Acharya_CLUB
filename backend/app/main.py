@@ -162,13 +162,13 @@ def create_app() -> FastAPI:
             return response
 
     app.include_router(health_router, prefix=settings.API_PREFIX, tags=["health"])
-    app.include_router(auth_router)
-    app.include_router(events_router)
-    app.include_router(registrations_router)
-    app.include_router(attendance_router)
-    app.include_router(notifications_router)
-    app.include_router(reports_router)
-    app.include_router(users_router)
+    app.include_router(auth_router, prefix=settings.API_PREFIX + "/auth")
+    app.include_router(events_router, prefix=settings.API_PREFIX + "/events")
+    app.include_router(registrations_router, prefix=settings.API_PREFIX + "/registrations")
+    app.include_router(attendance_router, prefix=settings.API_PREFIX + "/attendance")
+    app.include_router(notifications_router, prefix=settings.API_PREFIX + "/notifications")
+    app.include_router(reports_router, prefix=settings.API_PREFIX + "/reports")
+    app.include_router(users_router, prefix=settings.API_PREFIX + "/users")
 
     return app
 
