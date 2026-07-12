@@ -45,6 +45,16 @@ class Settings(BaseSettings):
 
 
     @model_validator(mode="after")
+    def enforce_sqlite(self):
+        if not self.DATABASE_URL.startswith("sqlite"):
+            warnings.warn(
+                f"Ignoring external DATABASE_URL in .env. "
+                "This application is currently configured for local SQLite only."
+            )
+            self.DATABASE_URL = "sqlite+aiosqlite:///./acharya_club.db"
+        return self
+
+    @model_validator(mode="after")
     def enforce_jwt_secret(self):
         if not self.JWT_SECRET or self.JWT_SECRET == "change-this-to-a-random-string-at-least-32-chars":
             if self.ENVIRONMENT == "development":
@@ -64,7 +74,6 @@ class Settings(BaseSettings):
                 f"(got {len(self.JWT_SECRET)})"
             )
         return self
-
 
 settings = Settings()
 
