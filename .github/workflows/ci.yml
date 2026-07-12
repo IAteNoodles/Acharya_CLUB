@@ -67,4 +67,4 @@ jobs:
     - name: Run real-DB tests (against CI Postgres)
       run: |
         cd backend
-        pytest -v tests/real_db/
+        pytest -v tests/real_db/ -o addopts=""
