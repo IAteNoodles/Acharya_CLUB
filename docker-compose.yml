@@ -1,0 +1,66 @@
+name: acharya-club
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: acharya
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d acharya"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    # entrypoint.sh runs `alembic upgrade head`, then this command seeds demo
+    # data only when the database is empty and starts the API
+    command: >
+      sh -c "python scripts/seed.py --if-empty &&
+             exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000"
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      DATABASE_URL: postgresql+asyncpg://postgres:localdev@db:5432/acharya
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: compose-dev-only-secret-change-in-production!!
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
