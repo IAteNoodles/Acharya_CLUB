@@ -232,3 +232,10 @@ backend/alembic/versions/*.pyc
 node_modules/
 **/node_modules/
 
+# Local notes/documentation
+EXPLAIN.md
+MISTAKES.md
+EXPLAIN
+MISTAKE.md
+
+
