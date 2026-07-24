@@ -85,7 +85,7 @@ export function PortalLayout({ role }: { role: Role }) {
             AC
           </span>
           <div className="leading-tight">
-            <p className="font-display text-sm font-semibold">Acharya CLUB</p>
+            <p className="font-display text-sm font-semibold">AcharyaEngage</p>
             <p className="text-[11px] uppercase tracking-[0.12em] text-paper/70">{role} portal</p>
           </div>
         </div>
@@ -131,7 +131,7 @@ export function PortalLayout({ role }: { role: Role }) {
             >
               AC
             </span>
-            <span className="font-display text-sm font-semibold">Acharya CLUB</span>
+            <span className="font-display text-sm font-semibold">AcharyaEngage</span>
           </div>
           <div className="hidden text-sm text-muted-foreground md:block" />
           <div className="flex items-center gap-1.5">

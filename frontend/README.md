@@ -1,4 +1,4 @@
-# Acharya CLUB — Frontend
+# AcharyaEngage — Frontend
 
 React SPA for the College Event Management System. Implements the plan in
 [`docs/frontend-architecture.md`](../docs/frontend-architecture.md) — read that first;

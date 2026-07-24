@@ -11,7 +11,7 @@ export function AuthLayout() {
           >
             AC
           </span>
-          <span className="font-display text-lg font-semibold tracking-tight">Acharya CLUB</span>
+          <span className="font-display text-lg font-semibold tracking-tight">AcharyaEngage</span>
         </div>
         <div>
           <h1 className="max-w-md font-display text-4xl font-bold leading-tight">
@@ -33,7 +33,7 @@ export function AuthLayout() {
             >
               AC
             </span>
-            <span className="font-display font-semibold">Acharya CLUB</span>
+            <span className="font-display font-semibold">AcharyaEngage</span>
           </div>
           <Outlet />
         </div>
