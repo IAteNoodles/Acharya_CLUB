@@ -11,6 +11,7 @@ class EventCreate(BaseModel):
     venue: str = Field(..., min_length=1, max_length=300)
     start_date: datetime
     end_date: datetime
+    max_registrations: int = Field(0, ge=0)
 
     @field_validator("event_type")
     @classmethod
@@ -31,9 +32,10 @@ class EventUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     category: Optional[str] = None
-    venue: Optional[str] = None
+    venue: Optional[str] = Field(None, min_length=1, max_length=300)
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    max_registrations: Optional[int] = Field(None, ge=0)
 
     @field_validator("category")
     @classmethod
@@ -101,6 +103,7 @@ class EventListItem(BaseModel):
     end_date: datetime
     registration_count: int = 0
     created_by_name: Optional[str] = None
+    coordinator_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFoundException, ForbiddenException, ConflictException
-from app.models.event import Event, EventStatus
+from app.models.event import Event, EventCategory, EventStatus
 from app.models.registration import Registration, RegistrationStatus
 from app.services.notification import NotificationService, NotificationType, _render_notification
 
@@ -28,6 +28,10 @@ class RegistrationService:
         if not event.coordinator_id:
             raise ConflictException("Event has no coordinator assigned")
 
+        category = event.category.value if hasattr(event.category, "value") else event.category
+        if category != EventCategory.BOTH.value and category != role_type:
+            raise ConflictException(f"Event only accepts {category} registrations")
+
         if event.max_registrations > 0:
             count_result = await db.execute(
                 select(func.count()).select_from(Registration).where(
@@ -43,11 +47,10 @@ class RegistrationService:
             select(Registration).where(
                 Registration.event_id == event_id,
                 Registration.student_id == uuid.UUID(current_user["sub"]),
-                Registration.role_type == role_type,
             )
         )
-        if result.scalar_one_or_none():
-            raise ConflictException("Already registered for this event with this role")
+        if result.scalars().first():
+            raise ConflictException("Already registered for this event")
 
         reg = Registration(
             event_id=event_id,
@@ -156,6 +159,16 @@ class RegistrationService:
 
         if reg.status != RegistrationStatus.PENDING:
             raise ConflictException("Registration is not in pending status")
+
+        if event.max_registrations > 0:
+            count_result = await db.execute(
+                select(func.count()).select_from(Registration).where(
+                    Registration.event_id == reg.event_id,
+                    Registration.status == RegistrationStatus.ACCEPTED,
+                )
+            )
+            if count_result.scalar_one() >= event.max_registrations:
+                raise ConflictException("Event has reached its maximum registration capacity")
 
         reg.status = RegistrationStatus.ACCEPTED
         title, message = _render_notification(

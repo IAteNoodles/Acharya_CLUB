@@ -66,7 +66,29 @@
       "Bash(git commit -q -m 'feat\\(docker\\): repo-root compose running db, redis, migrations, seed-if-empty, backend, frontend *)",
       "Bash(git commit -q -m 'docs: one-command Docker quick start in both READMEs *)",
       "Bash(git checkout *)",
-      "Bash(DATABASE_URL='postgresql+asyncpg://postgres@127.0.0.1:54329/acharya_local' JWT_SECRET='local-verify-secret-at-least-32-characters!!' PYTHONPATH=. bash -c 'cd backend && uv run pytest -q --ignore=tests/real_db 2>&1 | tail -1')"
+      "Bash(DATABASE_URL='postgresql+asyncpg://postgres@127.0.0.1:54329/acharya_local' JWT_SECRET='local-verify-secret-at-least-32-characters!!' PYTHONPATH=. bash -c 'cd backend && uv run pytest -q --ignore=tests/real_db 2>&1 | tail -1')",
+      "Bash(pytest -q)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://x:x@localhost:5432/x JWT_SECRET=test-secret-string-of-32-characters-min uv run pytest -q)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://x:x@localhost:5432/x JWT_SECRET=test-secret-string-of-32-characters-min uv run pytest -q --ignore=tests/real_db tests/test_auth_schemas.py tests/test_auth_service.py tests/test_auth.py)",
+      "Bash(git commit -m 'fix\\(auth\\): normalize emails to lowercase on signup and login *)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://x:x@localhost:5432/x JWT_SECRET=test-secret-string-of-32-characters-min uv run pytest -q --ignore=tests/real_db)",
+      "Bash(git commit -q -m 'fix\\(auth\\): block token refresh for inactive users and stop email enumeration *)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://x:x@localhost:5432/x JWT_SECRET=test-secret-string-of-32-characters-min uv run pytest -q --ignore=tests/real_db tests/test_registrations.py tests/test_e2e_workflows.py)",
+      "Bash(git commit -q -m 'fix\\(registrations\\): enforce event category, one registration per student, capacity on accept *)",
+      "Bash(git commit -q -m 'feat\\(events\\): settable max_registrations; out_college events are participation-only *)",
+      "Bash(git commit -q -m 'fix\\(events\\): gate updates and rejection by event status *)",
+      "Bash(git commit -q -m 'fix\\(events\\): return 422 instead of 500 for malformed IDs and filters *)",
+      "Bash(git commit -q -m 'fix\\(attendance\\): only approved events, only dates within the event window *)",
+      "Bash(git commit -q -m 'fix\\(api\\): auth guards return UNAUTHORIZED/FORBIDDEN error codes *)",
+      "Bash(git commit -q -m 'feat\\(auth\\): POST /auth/change-password *)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://x:x@localhost:5432/x JWT_SECRET=test-secret-string-of-32-characters-min uv run pytest --ignore=tests/real_db --cov=app --cov-report=term-missing -q)",
+      "Bash(git commit -q -m 'test: cover remaining authorization and schema-validation branches *)",
+      "Bash(/usr/lib/postgresql/14/bin/initdb -D /tmp/claude-1001/-home-sankalp-shankar-Project-Acharya-CLUB/34bdf778-424a-45c0-979b-0b07f1d20619/scratchpad/pgdata -U postgres -A trust)",
+      "Bash(/usr/lib/postgresql/14/bin/pg_ctl -D /tmp/claude-1001/-home-sankalp-shankar-Project-Acharya-CLUB/34bdf778-424a-45c0-979b-0b07f1d20619/scratchpad/pgdata -o '-p 54329 -k /tmp' -l /tmp/claude-1001/-home-sankalp-shankar-Project-Acharya-CLUB/34bdf778-424a-45c0-979b-0b07f1d20619/scratchpad/pg.log start)",
+      "Bash(/usr/lib/postgresql/14/bin/createdb -h /tmp -p 54329 -U postgres acharya_mig_test)",
+      "Bash(export DATABASE_URL='postgresql+asyncpg://postgres@127.0.0.1:54329/acharya_mig_test' JWT_SECRET=test-secret-string-of-32-characters-min)",
+      "Bash(/usr/lib/postgresql/14/bin/psql -h /tmp -p 54329 -U postgres -d acharya_mig_test -c \"DELETE FROM users WHERE name='C';\")",
+      "Bash(/usr/lib/postgresql/14/bin/pg_ctl -D /tmp/claude-1001/-home-sankalp-shankar-Project-Acharya-CLUB/34bdf778-424a-45c0-979b-0b07f1d20619/scratchpad/pgdata stop)"
     ]
   }
 }

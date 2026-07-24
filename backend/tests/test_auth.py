@@ -85,6 +85,49 @@ class TestAuthValidation:
             )
         assert res.status_code == 422
 
+    async def test_change_password_unauthenticated(self, app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/v1/auth/change-password",
+                json={"currentPassword": "OldPass123", "newPassword": "NewPass456"},
+            )
+        assert res.status_code == 401
+
+    async def test_change_password_validation_short_new_password(self, app):
+        from app.core.security import create_access_token
+
+        token = create_access_token(user_id="550e8400-e29b-41d4-a716-446655440000", role="student")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/v1/auth/change-password",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"currentPassword": "OldPass123", "newPassword": "short"},
+            )
+        assert res.status_code == 422
+
+    async def test_change_password_success(self, app):
+        from unittest.mock import AsyncMock, patch
+        from app.core.security import create_access_token
+
+        token = create_access_token(user_id="550e8400-e29b-41d4-a716-446655440000", role="student")
+        with patch(
+            "app.services.auth.change_password",
+            new=AsyncMock(return_value={"message": "Password changed successfully"}),
+        ):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                res = await client.post(
+                    "/api/v1/auth/change-password",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={"currentPassword": "OldPass123", "newPassword": "NewPass456"},
+                )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert data["data"]["message"] == "Password changed successfully"
+
     async def test_me_unauthenticated(self, app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

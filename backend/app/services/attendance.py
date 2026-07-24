@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.exceptions import NotFoundException, ForbiddenException, ConflictException
-from app.models.event import Event
+from app.models.event import Event, EventStatus
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.registration import Registration, RegistrationStatus
 
@@ -29,6 +29,12 @@ class AttendanceService:
         user_id = uuid.UUID(current_user["sub"])
         if current_user["role"] != "admin" and event.coordinator_id != user_id:
             raise ForbiddenException("You are not the coordinator of this event")
+
+        status_val = event.status.value if hasattr(event.status, "value") else event.status
+        if status_val != EventStatus.APPROVED.value:
+            raise ConflictException("Attendance can only be marked for approved events")
+        if not (event.start_date.date() <= att_date <= event.end_date.date()):
+            raise ConflictException("Attendance date must be within the event dates")
 
         student_ids = [r["studentId"] for r in records]
         reg_result = await db.execute(

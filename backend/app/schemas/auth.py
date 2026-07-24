@@ -20,6 +20,7 @@ class SignupRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
         if "@" not in v or "." not in v.split("@")[-1]:
             raise ValueError("Invalid email format")
         if not v.endswith("@college.edu"):
@@ -50,6 +51,7 @@ class LoginRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
         if "@" not in v or "." not in v.split("@")[-1]:
             raise ValueError("Invalid email format")
         return v
@@ -59,6 +61,27 @@ class LoginRequest(BaseModel):
     def validate_password(cls, v: str) -> str:
         if not v:
             raise ValueError("Password is required")
+        return v
+
+
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str
+
+    @field_validator("currentPassword")
+    @classmethod
+    def validate_current_password(cls, v: str) -> str:
+        if not v:
+            raise ValueError("Current password is required")
+        return v
+
+    @field_validator("newPassword")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if len(v) > 100:
+            raise ValueError("Password must not exceed 100 characters")
         return v
 
 

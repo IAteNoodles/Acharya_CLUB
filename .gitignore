@@ -227,15 +227,3 @@ backend/alembic/versions/*.pyc
 
 # Frontend workspace — un-ignore paths caught by the Python rules above
 !frontend/src/lib/
-
-# Node modules
-node_modules/
-**/node_modules/
-
-# Local notes/documentation
-EXPLAIN.md
-MISTAKES.md
-EXPLAIN
-MISTAKE.md
-
-

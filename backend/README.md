@@ -126,7 +126,7 @@ The API prefix is `/api/v1`.
 | Group | Endpoints | Auth | Description |
 |---|---|---|---|
 | `health` | `GET /health` | No | Health check |
-| `auth` | `POST /signup`, `/login`, `/refresh`, `/logout`, `GET /me` | Mixed | Authentication |
+| `auth` | `POST /signup`, `/login`, `/refresh`, `/logout`, `/change-password`, `GET /me` | Mixed | Authentication |
 | `events` | `GET`, `POST`, `GET /{id}`, `PUT /{id}`, `POST /{id}/approve`, `POST /{id}/reject`, `POST /{id}/assign-coordinator` | JWT | Event CRUD and moderation |
 | `registrations` | `POST /`, `GET /my`, `GET /event/{id}`, `PATCH /{id}/accept`, `PATCH /{id}/reject` | JWT | Registration management |
 | `attendance` | `POST /bulk`, `GET /event/{id}`, `GET /my` | JWT | Attendance tracking |

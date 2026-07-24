@@ -336,7 +336,7 @@ class SignupRequest(BaseModel):
 | Field | Rule |
 |---|---|
 | `name` | 2–120 characters, trimmed |
-| `email` | Valid email format, must end with `@college.edu` |
+| `email` | Valid email format, must end with `@college.edu`; trimmed and lowercased before storage (emails are case-insensitive) |
 | `password` | 8–100 characters |
 | `role` | Must be `"student"` or `"teacher"` |
 
@@ -480,6 +480,7 @@ async def refresh(request: RefreshRequest):
 | `VALIDATION_ERROR` | Missing refresh token |
 | `UNAUTHORIZED` | Invalid or expired refresh token |
 | `UNAUTHORIZED` | Refresh token reuse detected (breach) — all tokens revoked |
+| `403` | Account is no longer `active` (pending/rejected users cannot refresh) |
 
 ---
 
@@ -556,6 +557,41 @@ async def get_me(
     """Get current user's profile."""
     return current_user
 ```
+
+---
+
+### 7.6 POST /auth/change-password
+
+Change the authenticated user's password.
+
+**Authentication:** Required
+
+**Pydantic Schema:**
+
+```python
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str          # 8–100 characters, same rules as signup
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Password changed successfully"
+  }
+}
+```
+
+**Error Responses:**
+
+| Code | Scenario |
+|---|---|
+| `VALIDATION_ERROR` | Missing current password or new password outside 8–100 characters |
+| `401` | Current password is incorrect, or request unauthenticated |
+| `404` | User no longer exists |
 
 ---
 
@@ -899,6 +935,9 @@ Create a new event.
 | `teacher` | `out_college` | `pending` |
 | `admin` | `in_college` | `approved` |
 | `admin` | `out_college` | `approved` |
+
+**Category rule:** `out_college` events must use `category: "participant"` — they only accept
+participation (enforced at creation and on update; `VALIDATION_ERROR` otherwise).
 
 **Pydantic Schema:**
 
@@ -1283,7 +1322,7 @@ async def reject_event(
 | `VALIDATION_ERROR` | Missing `adminComment` |
 | `NOT_FOUND` | Event not found |
 | `FORBIDDEN` | Teacher is not the assigned coordinator |
-| `CONFLICT` | Event status is not `pending` |
+| `CONFLICT` | Event is already rejected, or is `approved` (approved events cannot be rejected) |
 
 ---
 
@@ -1462,10 +1501,11 @@ class RegisterRequest(BaseModel):
 | Condition | Behavior |
 |---|---|
 | Event status is `approved` | Proceed |
-| Event status is not `approved` | Return `EVENT_NOT_APPROVED` (409) |
-| Registration count >= `maxRegistrations` (if > 0) | Return `EVENT_FULL` (409) |
-| Duplicate `(eventId, studentId, roleType)` | Return `CONFLICT` (409) |
-| Dual registration (same event, different role) | Allowed — student can be both `volunteer` and `participant` |
+| Event status is not `approved` | Return `CONFLICT` (409) |
+| Event has no coordinator assigned | Return `CONFLICT` (409) |
+| `roleType` not accepted by event `category` (`participant`/`volunteer` must match; `both` allows either) | Return `CONFLICT` (409) |
+| Accepted registration count >= `maxRegistrations` (if > 0) | Return `CONFLICT` (409) |
+| Student already registered for the event (any role) | Return `CONFLICT` (409) — dual-role registration is not allowed |
 
 **Response `201 Created`:**
 
@@ -1500,9 +1540,7 @@ async def register_for_event(
 | Code | Scenario |
 |---|---|
 | `VALIDATION_ERROR` | Invalid `eventId` or `roleType` |
-| `EVENT_NOT_APPROVED` | Event status is not `approved` |
-| `EVENT_FULL` | Event has reached `maxRegistrations` |
-| `CONFLICT` | Already registered for this event with the same role |
+| `CONFLICT` | Event not approved / no coordinator / role not accepted by category / full / already registered |
 | `NOT_FOUND` | Event not found |
 
 ---
@@ -1967,6 +2005,7 @@ async def mark_bulk_attendance(
 | `VALIDATION_ERROR` | Invalid records or duplicate studentIds in batch |
 | `FORBIDDEN` | Teacher is not the assigned coordinator |
 | `NOT_FOUND` | Event not found |
+| `CONFLICT` | Event is not `approved`, `date` outside the event's start/end window, or a student lacks an accepted registration |
 
 ---
 

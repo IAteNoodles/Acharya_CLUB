@@ -341,9 +341,11 @@ class TestNotificationAPI:
     async def test_notifications_unauthorized(self):
         from fastapi import FastAPI
         from app.api.v1.notifications import router
+        from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
         app.include_router(router)
+        register_exception_handlers(app)
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -355,9 +357,11 @@ class TestNotificationAPI:
     async def test_mark_read_unauthorized(self):
         from fastapi import FastAPI
         from app.api.v1.notifications import router
+        from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
         app.include_router(router)
+        register_exception_handlers(app)
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -384,6 +388,7 @@ class TestRegistrationNotificationIntegration:
         mock_event = MagicMock()
         mock_event.title = "Tech Fest"
         mock_event.coordinator_id = coordinator_id
+        mock_event.max_registrations = 0
 
         db.get = AsyncMock(side_effect=[mock_reg, mock_event])
 

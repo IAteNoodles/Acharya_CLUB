@@ -139,9 +139,11 @@ class TestReportsAPI:
         from fastapi import FastAPI
         from app.api.v1.reports import router
         from app.api.deps import get_current_user
+        from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
         app.include_router(router)
+        register_exception_handlers(app)
         app.dependency_overrides[get_current_user] = lambda: None
 
         from httpx import ASGITransport, AsyncClient

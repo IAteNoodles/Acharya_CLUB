@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -89,6 +89,9 @@ class TestAttendanceService:
         db = AsyncMock()
         mock_event = MagicMock()
         mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
+        mock_event.status = "approved"
+        mock_event.start_date = datetime(2026, 7, 4)
+        mock_event.end_date = datetime(2026, 7, 5)
         db.get.return_value = mock_event
         mock_reg = MagicMock()
         mock_reg.student_id = STUDENT_ID
@@ -146,6 +149,9 @@ class TestAttendanceService:
         db = AsyncMock()
         mock_event = MagicMock()
         mock_event.coordinator_id = uuid.uuid4()
+        mock_event.status = "approved"
+        mock_event.start_date = datetime(2026, 7, 4)
+        mock_event.end_date = datetime(2026, 7, 5)
         db.get.return_value = mock_event
         mock_reg = MagicMock()
         mock_reg.student_id = STUDENT_ID
@@ -164,6 +170,44 @@ class TestAttendanceService:
         assert result["count"] == 1
 
     @pytest.mark.asyncio
+    async def test_mark_bulk_event_not_approved(self):
+        from app.services.attendance import AttendanceService
+        from datetime import date
+
+        db = AsyncMock()
+        mock_event = MagicMock()
+        mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
+        mock_event.status = "draft"
+        db.get.return_value = mock_event
+
+        with pytest.raises(ConflictException, match="approved events"):
+            await AttendanceService.mark_bulk(
+                db, EVENT_ID, date(2026, 7, 4),
+                [{"studentId": STUDENT_ID, "present": True}],
+                {"sub": str(TEACHER_ID), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_mark_bulk_date_outside_event_window(self):
+        from app.services.attendance import AttendanceService
+        from datetime import date
+
+        db = AsyncMock()
+        mock_event = MagicMock()
+        mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
+        mock_event.status = "approved"
+        mock_event.start_date = datetime(2026, 7, 4)
+        mock_event.end_date = datetime(2026, 7, 5)
+        db.get.return_value = mock_event
+
+        with pytest.raises(ConflictException, match="within the event dates"):
+            await AttendanceService.mark_bulk(
+                db, EVENT_ID, date(2026, 8, 1),
+                [{"studentId": STUDENT_ID, "present": True}],
+                {"sub": str(TEACHER_ID), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
     async def test_mark_bulk_student_not_registered(self):
         from app.services.attendance import AttendanceService
         from datetime import date
@@ -171,6 +215,9 @@ class TestAttendanceService:
         db = AsyncMock()
         mock_event = MagicMock()
         mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
+        mock_event.status = "approved"
+        mock_event.start_date = datetime(2026, 7, 4)
+        mock_event.end_date = datetime(2026, 7, 5)
         db.get.return_value = mock_event
         db.execute.return_value = MagicMock(
             scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
@@ -192,6 +239,8 @@ class TestAttendanceService:
         mock_event = MagicMock()
         mock_event.coordinator_id = uuid.UUID(str(TEACHER_ID))
         mock_event.status = "approved"
+        mock_event.start_date = datetime(2026, 7, 4)
+        mock_event.end_date = datetime(2026, 7, 5)
         db.get.return_value = mock_event
 
         mock_reg = MagicMock()
@@ -563,9 +612,11 @@ class TestAttendanceAPI:
     async def test_unauthorized_access_to_attendance(self):
         from fastapi import FastAPI
         from app.api.v1.attendance import router
+        from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
         app.include_router(router)
+        register_exception_handlers(app)
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

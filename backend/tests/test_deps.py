@@ -8,8 +8,10 @@ from app.core.security import create_access_token, create_refresh_token
 @pytest.fixture
 def app():
     from app.api.deps import get_current_user, require_admin, require_teacher_or_admin
+    from app.core.exceptions import register_exception_handlers
 
     test_app = FastAPI()
+    register_exception_handlers(test_app)
 
     @test_app.get("/api/v1/protected")
     async def protected(current_user: dict = Depends(get_current_user)):
@@ -33,6 +35,9 @@ class TestGetCurrentUser:
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             res = await ac.get("/api/v1/protected")
         assert res.status_code == 401
+        data = res.json()
+        assert data["success"] is False
+        assert data["error"]["code"] == "UNAUTHORIZED"
 
     async def test_returns_401_when_not_bearer(self, app):
         transport = ASGITransport(app=app)
@@ -80,6 +85,9 @@ class TestRequireAdmin:
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             res = await ac.get("/api/v1/admin", headers={"Authorization": f"Bearer {token}"})
         assert res.status_code == 403
+        data = res.json()
+        assert data["success"] is False
+        assert data["error"]["code"] == "FORBIDDEN"
 
 
 @pytest.mark.asyncio
@@ -119,8 +127,10 @@ class TestRequireStudent:
     def app(self):
         from fastapi import FastAPI
         from app.api.deps import require_student, get_current_user
+        from app.core.exceptions import register_exception_handlers
 
         test_app = FastAPI()
+        register_exception_handlers(test_app)
 
         @test_app.get("/api/v1/student-only")
         async def student_only(current_user: dict = Depends(require_student)):

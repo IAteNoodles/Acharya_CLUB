@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -45,8 +47,11 @@ async def list_events(
             status=e.status.value,
             start_date=e.start_date,
             end_date=e.end_date,
-            registration_count=len(getattr(e, "registrations", []) or []),
+            registration_count=sum(
+                1 for r in (getattr(e, "registrations", []) or []) if r.status == "accepted"
+            ),
             created_by_name=e.creator.name if e.creator else None,
+            coordinator_name=e.coordinator.name if e.coordinator else None,
         )
         for e in events
     ]
@@ -72,57 +77,57 @@ async def create_event(
 
 @router.get("/{event_id}", response_model=EventOut)
 async def get_event(
-    event_id: str,
+    event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    event = await EventService.get_event_by_id(db, event_id)
+    event = await EventService.get_event_by_id(db, str(event_id))
     return _event_to_out(event)
 
 
 @router.patch("/{event_id}", response_model=EventOut)
 async def update_event(
-    event_id: str,
+    event_id: uuid.UUID,
     data: EventUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     event = await EventService.update_event(
-        db, event_id, data.model_dump(exclude_unset=True), current_user,
+        db, str(event_id), data.model_dump(exclude_unset=True), current_user,
     )
     return _event_to_out(event)
 
 
 @router.patch("/{event_id}/approve", response_model=EventOut)
 async def approve_event(
-    event_id: str,
+    event_id: uuid.UUID,
     data: EventApprove,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    event = await EventService.approve_event(db, event_id, data.admin_comment, current_user)
+    event = await EventService.approve_event(db, str(event_id), data.admin_comment, current_user)
     return _event_to_out(event)
 
 
 @router.patch("/{event_id}/reject", response_model=EventOut)
 async def reject_event(
-    event_id: str,
+    event_id: uuid.UUID,
     data: EventReject,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    event = await EventService.reject_event(db, event_id, data.admin_comment, current_user)
+    event = await EventService.reject_event(db, str(event_id), data.admin_comment, current_user)
     return _event_to_out(event)
 
 
 @router.patch("/{event_id}/assign-coordinator", response_model=EventOut)
 async def assign_coordinator(
-    event_id: str,
+    event_id: uuid.UUID,
     data: EventAssignCoordinator,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    event = await EventService.assign_coordinator(db, event_id, data.coordinator_id)
+    event = await EventService.assign_coordinator(db, str(event_id), data.coordinator_id)
     return _event_to_out(event)
 
 

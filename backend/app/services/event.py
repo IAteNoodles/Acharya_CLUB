@@ -10,6 +10,19 @@ from app.schemas.event import EventCreate
 from app.services.notification import NotificationService, NotificationType, _render_notification
 
 
+def _parse_enum(enum_cls, value: str, field: str):
+    from app.core.exceptions import ValidationException
+
+    try:
+        return enum_cls(value)
+    except ValueError:
+        allowed = ", ".join(e.value for e in enum_cls)
+        raise ValidationException(
+            detail=f"Invalid {field} filter",
+            errors=[{"loc": [field], "msg": f"must be one of: {allowed}"}],
+        )
+
+
 class EventService:
 
     @staticmethod
@@ -51,12 +64,12 @@ class EventService:
                     pass
 
         if status:
-            query = query.where(Event.status == EventStatus(status))
+            query = query.where(Event.status == _parse_enum(EventStatus, status, "status"))
         if event_type:
-            query = query.where(Event.event_type == EventType(event_type))
+            query = query.where(Event.event_type == _parse_enum(EventType, event_type, "type"))
         if category:
             from app.models.event import EventCategory
-            query = query.where(Event.category == EventCategory(category))
+            query = query.where(Event.category == _parse_enum(EventCategory, category, "category"))
         if search:
             query = query.where(Event.title.ilike(f"%{search}%"))
 
@@ -95,6 +108,11 @@ class EventService:
             raise ForbiddenException("Only admins can create in_college events")
         if data.event_type == "out_college" and user_role != "student":
             raise ForbiddenException("Only students can create out_college events")
+        if data.event_type == "out_college" and data.category != "participant":
+            raise ValidationException(
+                detail="Out-of-college events only accept participation",
+                errors=[{"loc": ["category"], "msg": "must be 'participant' for out_college events"}],
+            )
 
         status = EventStatus.DRAFT if data.event_type == "in_college" else EventStatus.PENDING
 
@@ -108,6 +126,7 @@ class EventService:
             status=status,
             start_date=data.start_date,
             end_date=data.end_date,
+            max_registrations=data.max_registrations,
             created_by=uuid.UUID(user.get("sub")),
         )
         db.add(event)
@@ -126,13 +145,18 @@ class EventService:
     ) -> Event:
         from app.core.exceptions import NotFoundException
 
+        try:
+            event_uuid = uuid.UUID(event_id)
+        except ValueError:
+            raise NotFoundException(detail="Event not found")
+
         query = (
             select(Event)
             .options(
                 selectinload(Event.creator),
                 selectinload(Event.coordinator),
             )
-            .where(Event.id == uuid.UUID(event_id))
+            .where(Event.id == event_uuid)
         )
         result = await db.execute(query)
         event = result.scalar_one_or_none()
@@ -149,7 +173,7 @@ class EventService:
         data: dict,
         user: dict,
     ) -> Event:
-        from app.core.exceptions import ForbiddenException
+        from app.core.exceptions import ConflictException, ForbiddenException, ValidationException
 
         event = await EventService.get_event_by_id(db, event_id)
 
@@ -159,6 +183,17 @@ class EventService:
         is_admin = user_role == "admin"
         if not is_creator and not is_admin:
             raise ForbiddenException("Not authorized to update this event")
+
+        status_val = event.status.value if hasattr(event.status, "value") else event.status
+        if not is_admin and status_val not in (EventStatus.DRAFT.value, EventStatus.PENDING.value):
+            raise ConflictException("Only draft or pending events can be updated")
+
+        event_type = event.event_type.value if hasattr(event.event_type, "value") else event.event_type
+        if data.get("category") and event_type == "out_college" and data["category"] != "participant":
+            raise ValidationException(
+                detail="Out-of-college events only accept participation",
+                errors=[{"loc": ["category"], "msg": "must be 'participant' for out_college events"}],
+            )
 
         for field, value in data.items():
             if value is not None:
@@ -225,6 +260,8 @@ class EventService:
 
         if event.status == EventStatus.REJECTED:
             raise ConflictException("Event is already rejected")
+        if event.status == EventStatus.APPROVED:
+            raise ConflictException("Cannot reject an approved event")
 
         user_role = user.get("role")
         user_id_str = user.get("sub")

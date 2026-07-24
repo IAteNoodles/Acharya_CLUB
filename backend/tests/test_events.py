@@ -46,6 +46,77 @@ class TestEventSchemas:
                 end_date=datetime.utcnow() + timedelta(days=2),
             )
 
+    def test_event_create_accepts_max_registrations(self):
+        from app.schemas.event import EventCreate
+
+        data = EventCreate(
+            title="Tech Fest",
+            event_type="in_college",
+            category="both",
+            venue="Main Auditorium",
+            start_date=datetime.utcnow() + timedelta(days=1),
+            end_date=datetime.utcnow() + timedelta(days=2),
+            max_registrations=50,
+        )
+        assert data.max_registrations == 50
+
+    def test_event_create_defaults_max_registrations_to_zero(self):
+        from app.schemas.event import EventCreate
+
+        data = EventCreate(
+            title="Tech Fest",
+            event_type="in_college",
+            category="both",
+            venue="Main Auditorium",
+            start_date=datetime.utcnow() + timedelta(days=1),
+            end_date=datetime.utcnow() + timedelta(days=2),
+        )
+        assert data.max_registrations == 0
+
+    def test_event_create_rejects_negative_max_registrations(self):
+        from app.schemas.event import EventCreate
+
+        with pytest.raises(ValidationError):
+            EventCreate(
+                title="Tech Fest",
+                event_type="in_college",
+                category="both",
+                venue="Main Auditorium",
+                start_date=datetime.utcnow() + timedelta(days=1),
+                end_date=datetime.utcnow() + timedelta(days=2),
+                max_registrations=-1,
+            )
+
+    def test_event_update_rejects_negative_max_registrations(self):
+        from app.schemas.event import EventUpdate
+
+        with pytest.raises(ValidationError):
+            EventUpdate(max_registrations=-5)
+
+    def test_event_create_rejects_invalid_category(self):
+        from app.schemas.event import EventCreate
+
+        with pytest.raises(ValidationError):
+            EventCreate(
+                title="Fest",
+                event_type="in_college",
+                category="spectator",
+                venue="Main Auditorium",
+                start_date=datetime.utcnow() + timedelta(days=1),
+                end_date=datetime.utcnow() + timedelta(days=2),
+            )
+
+    def test_event_update_rejects_invalid_category(self):
+        from app.schemas.event import EventUpdate
+
+        with pytest.raises(ValidationError):
+            EventUpdate(category="spectator")
+
+    def test_event_update_accepts_valid_category(self):
+        from app.schemas.event import EventUpdate
+
+        assert EventUpdate(category="both").category == "both"
+
     def test_reject_schema_requires_comment(self):
         from app.schemas.event import EventReject
 
@@ -114,6 +185,78 @@ class TestEventService:
 
 
     @pytest.mark.asyncio
+    async def test_list_events_student_sees_only_approved(self):
+        from app.services.event import EventService
+
+        db = AsyncMock()
+        db.scalar.return_value = 0
+        db.execute.return_value = MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[]))))
+
+        events, total = await EventService.list_events(
+            db, {"sub": str(uuid.uuid4()), "role": "student"},
+            page=1, limit=20,
+        )
+
+        assert total == 0
+
+    @pytest.mark.asyncio
+    async def test_approve_event_not_authorized(self):
+        from app.services.event import EventService
+        from app.core.exceptions import ForbiddenException
+
+        mock_event = MagicMock()
+        mock_event.status = "pending"
+        mock_event.coordinator_id = uuid.uuid4()
+
+        db = AsyncMock()
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        with pytest.raises(ForbiddenException, match="Not authorized to approve"):
+            await EventService.approve_event(
+                db, self.VALID_EVENT_ID, None,
+                {"sub": str(uuid.uuid4()), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_reject_event_not_authorized(self):
+        from app.services.event import EventService
+        from app.core.exceptions import ForbiddenException
+
+        mock_event = MagicMock()
+        mock_event.status = "pending"
+        mock_event.coordinator_id = uuid.uuid4()
+
+        db = AsyncMock()
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        with pytest.raises(ForbiddenException, match="Not authorized to reject"):
+            await EventService.reject_event(
+                db, self.VALID_EVENT_ID, "No",
+                {"sub": str(uuid.uuid4()), "role": "teacher"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_assign_coordinator_success(self):
+        from app.services.event import EventService
+
+        mock_event = MagicMock()
+        mock_coordinator = MagicMock()
+        mock_coordinator.role = MagicMock(value="teacher")
+        mock_coordinator.status = MagicMock(value="active")
+
+        db = AsyncMock()
+        db.execute.side_effect = [
+            MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event)),
+            MagicMock(scalar_one_or_none=MagicMock(return_value=mock_coordinator)),
+        ]
+
+        coordinator_id = str(uuid.uuid4())
+        result = await EventService.assign_coordinator(db, self.VALID_EVENT_ID, coordinator_id)
+
+        assert mock_event.coordinator_id == uuid.UUID(coordinator_id)
+        db.commit.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_list_events_teacher_role_invalid_uuid(self):
         from app.services.event import EventService
 
@@ -143,6 +286,27 @@ class TestEventService:
         )
 
         assert total == 5
+
+    @pytest.mark.asyncio
+    async def test_list_events_invalid_status_filter(self):
+        from app.services.event import EventService
+        from app.core.exceptions import ValidationException
+
+        db = AsyncMock()
+
+        with pytest.raises(ValidationException, match="Invalid status filter"):
+            await EventService.list_events(
+                db, {"sub": "admin-uuid", "role": "admin"},
+                page=1, limit=20, status="bogus",
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_event_malformed_uuid_raises_not_found(self):
+        from app.services.event import EventService
+        from app.core.exceptions import NotFoundException
+
+        with pytest.raises(NotFoundException):
+            await EventService.get_event_by_id(AsyncMock(), "not-a-uuid")
 
     @pytest.mark.asyncio
     async def test_create_event_end_date_before_start(self):
@@ -196,6 +360,46 @@ class TestEventService:
                 {"sub": str(uuid.uuid4()), "role": "teacher"},
             )
 
+    @pytest.mark.asyncio
+    async def test_create_event_out_college_must_be_participant(self):
+        from app.services.event import EventService
+        from app.schemas.event import EventCreate
+        from app.core.exceptions import ValidationException
+
+        with pytest.raises(ValidationException, match="only accept participation"):
+            await EventService.create_event(
+                AsyncMock(),
+                EventCreate(
+                    title="Test", event_type="out_college", category="both",
+                    venue="Hall", start_date=datetime.utcnow() + timedelta(days=1),
+                    end_date=datetime.utcnow() + timedelta(days=2),
+                ),
+                {"sub": str(uuid.uuid4()), "role": "student"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_create_event_persists_max_registrations(self):
+        from app.services.event import EventService
+        from app.schemas.event import EventCreate
+
+        db = AsyncMock()
+        db.add = MagicMock()
+        db.execute.return_value = MagicMock(scalar_one=MagicMock(return_value=MagicMock()))
+
+        await EventService.create_event(
+            db,
+            EventCreate(
+                title="Test", event_type="in_college", category="both",
+                venue="Hall", start_date=datetime.utcnow() + timedelta(days=1),
+                end_date=datetime.utcnow() + timedelta(days=2),
+                max_registrations=25,
+            ),
+            {"sub": str(uuid.uuid4()), "role": "admin"},
+        )
+
+        created = db.add.call_args[0][0]
+        assert created.max_registrations == 25
+
     VALID_EVENT_ID = "550e8400-e29b-41d4-a716-446655440000"
 
     @pytest.mark.asyncio
@@ -218,12 +422,33 @@ class TestEventService:
             )
 
     @pytest.mark.asyncio
+    async def test_update_event_out_college_category_locked(self):
+        from app.services.event import EventService
+        from app.core.exceptions import ValidationException
+
+        mock_event = MagicMock()
+        mock_event.created_by = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
+        mock_event.event_type = "out_college"
+        mock_event.status = "pending"
+
+        db = AsyncMock()
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        with pytest.raises(ValidationException, match="only accept participation"):
+            await EventService.update_event(
+                db, self.VALID_EVENT_ID, {"category": "both"},
+                {"sub": "550e8400-e29b-41d4-a716-446655440000", "role": "student"},
+            )
+
+    @pytest.mark.asyncio
     async def test_update_event_success(self):
         from app.services.event import EventService
 
         mock_event = MagicMock()
         mock_event.created_by = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
         mock_event.title = "Original"
+        mock_event.event_type = "out_college"
+        mock_event.status = "pending"
 
         db = AsyncMock()
         db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
@@ -237,6 +462,44 @@ class TestEventService:
         assert mock_event.title == "Updated"
         db.commit.assert_called_once()
         db.refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_event_creator_blocked_after_approval(self):
+        from app.services.event import EventService
+        from app.core.exceptions import ConflictException
+
+        mock_event = MagicMock()
+        mock_event.created_by = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
+        mock_event.status = "approved"
+
+        db = AsyncMock()
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        with pytest.raises(ConflictException, match="draft or pending"):
+            await EventService.update_event(
+                db, self.VALID_EVENT_ID, {"title": "Sneaky edit"},
+                {"sub": "550e8400-e29b-41d4-a716-446655440000", "role": "student"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_event_admin_can_edit_approved(self):
+        from app.services.event import EventService
+
+        mock_event = MagicMock()
+        mock_event.created_by = uuid.uuid4()
+        mock_event.event_type = "in_college"
+        mock_event.status = "approved"
+
+        db = AsyncMock()
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        await EventService.update_event(
+            db, self.VALID_EVENT_ID, {"title": "Fixed typo"},
+            {"sub": str(uuid.uuid4()), "role": "admin"},
+        )
+
+        assert mock_event.title == "Fixed typo"
+        db.commit.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_approve_event_already_approved(self):
@@ -314,6 +577,24 @@ class TestEventService:
         with pytest.raises(ConflictException, match="already rejected"):
             await EventService.reject_event(
                 db, self.VALID_EVENT_ID, "Not suitable",
+                {"sub": "admin-uuid", "role": "admin"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_reject_event_approved_blocked(self):
+        from app.services.event import EventService
+        from app.core.exceptions import ConflictException
+
+        mock_event = MagicMock()
+        mock_event.status = "approved"
+        mock_event.id = self.VALID_EVENT_ID
+
+        db = AsyncMock()
+        db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_event))
+
+        with pytest.raises(ConflictException, match="Cannot reject an approved event"):
+            await EventService.reject_event(
+                db, self.VALID_EVENT_ID, "Changed my mind",
                 {"sub": "admin-uuid", "role": "admin"},
             )
 
@@ -419,6 +700,41 @@ class TestEventsAPI:
             assert data["total"] == 0
 
     @pytest.mark.asyncio
+    async def test_list_events_counts_accepted_and_exposes_coordinator(self, api_app):
+        from httpx import ASGITransport, AsyncClient
+        from unittest.mock import patch, MagicMock
+        from app.models.event import EventType, EventCategory, EventStatus
+        from app.models.registration import RegistrationStatus
+
+        accepted = MagicMock()
+        accepted.status = RegistrationStatus.ACCEPTED
+        pending = MagicMock()
+        pending.status = RegistrationStatus.PENDING
+
+        mock_event = MagicMock()
+        mock_event.id = "550e8400-e29b-41d4-a716-446655440000"
+        mock_event.title = "Tech Fest"
+        mock_event.event_type = EventType.IN_COLLEGE
+        mock_event.category = EventCategory.BOTH
+        mock_event.status = EventStatus.APPROVED
+        mock_event.start_date = datetime.utcnow() + timedelta(days=1)
+        mock_event.end_date = datetime.utcnow() + timedelta(days=2)
+        mock_event.registrations = [accepted, pending]
+        mock_event.creator = MagicMock()
+        mock_event.creator.name = "Admin User"
+        mock_event.coordinator = None
+
+        with patch("app.services.event.EventService.list_events", return_value=([mock_event], 1)):
+            transport = ASGITransport(app=api_app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.get("/api/v1/events")
+
+        assert resp.status_code == 200
+        item = resp.json()["items"][0]
+        assert item["registration_count"] == 1
+        assert item["coordinator_name"] is None
+
+    @pytest.mark.asyncio
     async def test_list_events_with_search(self, api_app):
         from httpx import ASGITransport, AsyncClient
         from unittest.mock import patch
@@ -469,6 +785,32 @@ class TestEventsAPI:
                 })
 
             assert resp.status_code == 201
+
+    @pytest.mark.asyncio
+    async def test_get_event_malformed_uuid_returns_422_envelope(self, api_app):
+        from httpx import ASGITransport, AsyncClient
+
+        transport = ASGITransport(app=api_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/events/not-a-uuid")
+
+        assert resp.status_code == 422
+        data = resp.json()
+        assert data["success"] is False
+        assert data["error"]["code"] == "VALIDATION_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_list_events_invalid_status_returns_422(self, api_app):
+        from httpx import ASGITransport, AsyncClient
+
+        transport = ASGITransport(app=api_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/events?status=bogus")
+
+        assert resp.status_code == 422
+        data = resp.json()
+        assert data["success"] is False
+        assert data["error"]["code"] == "VALIDATION_ERROR"
 
     @pytest.mark.asyncio
     async def test_create_event_invalid_body(self, api_app):
@@ -523,7 +865,7 @@ class TestEventsAPI:
 
             transport = ASGITransport(app=api_app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
-                resp = await client.get("/api/v1/events/999")
+                resp = await client.get(f"/api/v1/events/{uuid.uuid4()}")
 
             assert resp.status_code == 404
 
@@ -664,9 +1006,11 @@ class TestEventsAPI:
         from httpx import ASGITransport, AsyncClient
         from fastapi import FastAPI
         from app.api.v1.events import router
+        from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
         app.include_router(router)
+        register_exception_handlers(app)
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

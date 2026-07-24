@@ -136,18 +136,21 @@ class TestLogin:
                 )
             assert "Invalid" in str(exc.value)
 
-    async def test_raises_on_user_not_found(self, mock_session):
+    async def test_raises_generic_message_on_user_not_found(self, mock_session):
+        from fastapi import HTTPException
+
         mock_session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=lambda: None))
 
         from app.services.auth import login
 
-        with pytest.raises(Exception) as exc:
+        with pytest.raises(HTTPException) as exc:
             await login(
                 db=mock_session,
                 email="nonexistent@college.edu",
                 password="SecurePass123",
             )
-        assert "not found" in str(exc.value).lower()
+        assert exc.value.status_code == 401
+        assert exc.value.detail == "Invalid email or password"
 
     async def test_raises_on_inactive_user(self, mock_session, mock_user):
         mock_user.status = "pending"
@@ -172,6 +175,7 @@ class TestRefresh:
 
         user = User(id=uuid.uuid4(), name="Test", email="test@test.com")
         user.role = "admin"
+        user.status = "active"
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = user
@@ -246,6 +250,84 @@ class TestRefresh:
             with pytest.raises(Exception) as exc:
                 await refresh(db=mock_db, refresh_token="valid-token")
             assert "not found" in str(exc.value).lower()
+
+    async def test_raises_on_inactive_user(self):
+        from app.models.user import User
+        from fastapi import HTTPException
+        from app.services.auth import refresh, _blacklisted_tokens_fallback
+
+        _blacklisted_tokens_fallback.clear()
+
+        user = User(id=uuid.uuid4(), name="Test", email="test@test.com")
+        user.role = "teacher"
+        user.status = "rejected"
+
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=user))
+
+        payload = {"sub": str(user.id), "type": "refresh"}
+
+        with patch("app.services.auth.verify_token", return_value=payload):
+            with pytest.raises(HTTPException) as exc:
+                await refresh(db=mock_db, refresh_token="valid-token")
+            assert exc.value.status_code == 403
+            assert "not active" in exc.value.detail.lower()
+
+
+@pytest.mark.asyncio
+class TestChangePassword:
+    async def test_changes_password_on_valid_current(self, mock_session, mock_user):
+        mock_session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=lambda: mock_user))
+
+        with (
+            patch("app.services.auth.verify_password", return_value=True),
+            patch("app.services.auth.hash_password", return_value="new-hash"),
+        ):
+            from app.services.auth import change_password
+
+            result = await change_password(
+                db=mock_session,
+                user_id="550e8400-e29b-41d4-a716-446655440000",
+                current_password="OldPass123",
+                new_password="NewPass456",
+            )
+
+        assert mock_user.password_hash == "new-hash"
+        assert mock_session.commit.called
+        assert "successfully" in result["message"]
+
+    async def test_raises_on_wrong_current_password(self, mock_session, mock_user):
+        from fastapi import HTTPException
+
+        mock_session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=lambda: mock_user))
+
+        with patch("app.services.auth.verify_password", return_value=False):
+            from app.services.auth import change_password
+
+            with pytest.raises(HTTPException) as exc:
+                await change_password(
+                    db=mock_session,
+                    user_id="550e8400-e29b-41d4-a716-446655440000",
+                    current_password="WrongPass",
+                    new_password="NewPass456",
+                )
+            assert exc.value.status_code == 401
+            assert "incorrect" in exc.value.detail.lower()
+
+    async def test_raises_on_user_not_found(self, mock_session):
+        from fastapi import HTTPException
+        from app.services.auth import change_password
+
+        mock_session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=lambda: None))
+
+        with pytest.raises(HTTPException) as exc:
+            await change_password(
+                db=mock_session,
+                user_id="550e8400-e29b-41d4-a716-446655440000",
+                current_password="OldPass123",
+                new_password="NewPass456",
+            )
+        assert exc.value.status_code == 404
 
 
 @pytest.mark.asyncio

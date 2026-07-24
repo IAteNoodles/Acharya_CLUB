@@ -95,7 +95,7 @@ async def login(db: AsyncSession, email: str, password: str) -> dict:
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Invalid email or password",
         )
 
     if not verify_password(password, user.password_hash):
@@ -159,6 +159,13 @@ async def refresh(db: AsyncSession, refresh_token: str) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    if _enum_val(user.status) != UserStatus.ACTIVE.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not active. Please contact administrator.",
+        )
+
     actual_role = _enum_val(user.role)
 
     new_access = create_access_token(user_id=user_id, role=actual_role)
@@ -167,6 +174,33 @@ async def refresh(db: AsyncSession, refresh_token: str) -> dict:
     await _add_to_blacklist(refresh_token, settings.JWT_REFRESH_EXPIRE_DAYS * 86400)
 
     return {"accessToken": new_access, "refreshToken": new_refresh}
+
+
+async def change_password(
+    db: AsyncSession,
+    user_id: str,
+    current_password: str,
+    new_password: str,
+) -> dict:
+    from fastapi import HTTPException, status
+
+    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if not verify_password(current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+
+    user.password_hash = hash_password(new_password)
+    await db.commit()
+    return {"message": "Password changed successfully"}
 
 
 async def logout(refresh_token: str) -> dict:

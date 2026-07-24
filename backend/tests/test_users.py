@@ -604,9 +604,11 @@ class TestUsersAPI:
         from httpx import ASGITransport, AsyncClient
         from fastapi import FastAPI
         from app.api.v1.users import router
+        from app.core.exceptions import register_exception_handlers
 
         app = FastAPI()
         app.include_router(router)
+        register_exception_handlers(app)
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -635,6 +637,8 @@ class TestUsersAPI:
         async def mock_student():
             return {"sub": "student-uuid", "role": "student"}
 
+        from app.core.exceptions import register_exception_handlers
+        register_exception_handlers(app)
         app.dependency_overrides[deps.get_current_user] = mock_student
         app.dependency_overrides[deps.require_admin] = deps.require_admin
 

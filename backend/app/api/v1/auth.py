@@ -5,6 +5,7 @@ from app.api.deps import get_current_user
 from app.schemas.auth import (
     SignupRequest,
     LoginRequest,
+    ChangePasswordRequest,
     RefreshRequest,
     TokenResponse,
     UserResponse,
@@ -60,6 +61,21 @@ async def logout(
 ):
     await auth_service.logout(refresh_token=data.refreshToken)
     return {"success": True, "data": {"message": "Logged out successfully"}}
+
+
+@router.post("/change-password")
+async def change_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    result = await auth_service.change_password(
+        db=db,
+        user_id=current_user["sub"],
+        current_password=data.currentPassword,
+        new_password=data.newPassword,
+    )
+    return {"success": True, "data": result}
 
 
 @router.get("/me")

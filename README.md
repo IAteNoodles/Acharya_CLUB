@@ -208,6 +208,7 @@ All endpoints prefixed with `/api/v1`. Bearer JWT required except `health`, `aut
 | POST | `/auth/login` | None | Login |
 | POST | `/auth/refresh` | None | Rotate refresh token |
 | POST | `/auth/logout` | Any | Blacklist tokens |
+| POST | `/auth/change-password` | Any | Change own password |
 | GET | `/auth/me` | Any | Current user profile |
 
 ### Users

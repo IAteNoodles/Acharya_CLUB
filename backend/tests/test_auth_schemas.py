@@ -49,6 +49,24 @@ class TestSignupRequest:
                 role="student",
             )
 
+    def test_lowercases_email(self):
+        data = SignupRequest(
+            name="Priya Singh",
+            email="Priya.Singh@College.EDU",
+            password="SecurePass123",
+            role="student",
+        )
+        assert data.email == "priya.singh@college.edu"
+
+    def test_trims_email(self):
+        data = SignupRequest(
+            name="Priya Singh",
+            email="  priya.singh@college.edu  ",
+            password="SecurePass123",
+            role="student",
+        )
+        assert data.email == "priya.singh@college.edu"
+
     def test_rejects_non_college_email(self):
         with pytest.raises(ValidationError) as exc:
             SignupRequest(
@@ -112,6 +130,10 @@ class TestLoginRequest:
         assert data.email == "test@college.edu"
         assert data.password == "password123"
 
+    def test_lowercases_email(self):
+        data = LoginRequest(email="Test@College.edu", password="password123")
+        assert data.email == "test@college.edu"
+
     def test_rejects_missing_email(self):
         with pytest.raises(ValidationError):
             LoginRequest(password="password123")
@@ -123,6 +145,33 @@ class TestLoginRequest:
     def test_rejects_empty_password(self):
         with pytest.raises(ValidationError):
             LoginRequest(email="test@college.edu", password="")
+
+
+class TestChangePasswordRequest:
+    def test_accepts_valid_data(self):
+        from app.schemas.auth import ChangePasswordRequest
+
+        data = ChangePasswordRequest(currentPassword="OldPass123", newPassword="NewPass456")
+        assert data.newPassword == "NewPass456"
+
+    def test_rejects_empty_current_password(self):
+        from app.schemas.auth import ChangePasswordRequest
+
+        with pytest.raises(ValidationError):
+            ChangePasswordRequest(currentPassword="", newPassword="NewPass456")
+
+    def test_rejects_short_new_password(self):
+        from app.schemas.auth import ChangePasswordRequest
+
+        with pytest.raises(ValidationError) as exc:
+            ChangePasswordRequest(currentPassword="OldPass123", newPassword="short")
+        assert "at least 8" in str(exc.value)
+
+    def test_rejects_long_new_password(self):
+        from app.schemas.auth import ChangePasswordRequest
+
+        with pytest.raises(ValidationError):
+            ChangePasswordRequest(currentPassword="OldPass123", newPassword="A" * 101)
 
 
 class TestRefreshRequest:
