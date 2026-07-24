@@ -63,9 +63,9 @@ export function DashboardPage() {
           </Link>
         </div>
         {upcomingPending ? (
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }, (_, i) => (
-              <Skeleton key={i} className="h-36 w-72 shrink-0 rounded-md" />
+              <Skeleton key={i} className="h-36 rounded-md" />
             ))}
           </div>
         ) : upcomingEvents.length === 0 ? (
@@ -75,11 +75,9 @@ export function DashboardPage() {
             description="Check back soon, or raise an Out-College event yourself."
           />
         ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {upcomingEvents.map((event) => (
-              <div key={event.id} className="w-72 shrink-0">
-                <EventCard event={event} href={`/student/events/${event.id}`} />
-              </div>
+              <EventCard key={event.id} event={event} href={`/student/events/${event.id}`} />
             ))}
           </div>
         )}

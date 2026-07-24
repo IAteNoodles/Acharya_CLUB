@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useEvent } from '@/hooks/useEvents';
 import { useMyRegistrations } from '@/hooks/useRegistrations';
 import { formatDateRange } from '@/lib/format';
-import type { RegistrationRole } from '@/types/enums';
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,10 +39,7 @@ export function EventDetailPage() {
   }
 
   const mine = (myRegistrations?.items ?? []).filter((reg) => reg.event_id === event.id);
-  const takenRoles = mine.map((reg) => reg.role_type);
-  const offeredRoles: RegistrationRole[] =
-    event.category === 'both' ? ['participant', 'volunteer'] : [event.category];
-  const openRoles = offeredRoles.filter((role) => !takenRoles.includes(role));
+  const alreadyRegistered = mine.length > 0;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -116,13 +112,13 @@ export function EventDetailPage() {
               <p className="text-sm text-muted-foreground">
                 Registration opens once a coordinator is assigned.
               </p>
-            ) : openRoles.length > 0 ? (
-              <JoinEventSheet event={event} takenRoles={takenRoles} />
-            ) : (
+            ) : alreadyRegistered ? (
               <p className="text-sm text-muted-foreground">
-                You've requested every available role for this event
+                You've already registered for this event
                 {mine.length === 1 ? ` (${statusLabel(mine[0].status).toLowerCase()})` : ''}.
               </p>
+            ) : (
+              <JoinEventSheet event={event} />
             )}
           </div>
         )}

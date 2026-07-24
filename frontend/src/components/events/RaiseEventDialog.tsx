@@ -25,7 +25,7 @@ export function RaiseEventDialog({ onCreated }: { onCreated?: () => void }) {
       title: values.title,
       description: values.description || null,
       event_type: 'out_college',
-      category: values.category,
+      category: 'participant',
       venue: values.venue,
       start_date: values.start_date,
       end_date: values.end_date,
@@ -52,7 +52,7 @@ export function RaiseEventDialog({ onCreated }: { onCreated?: () => void }) {
             registrations. Include a brochure link in the description if you have one.
           </DialogDescription>
         </DialogHeader>
-        <EventForm submitLabel="Submit for approval" onSubmit={submit} />
+        <EventForm submitLabel="Submit for approval" lockCategory="participant" onSubmit={submit} />
       </DialogContent>
     </Dialog>
   );

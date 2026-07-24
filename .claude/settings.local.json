@@ -88,7 +88,8 @@
       "Bash(/usr/lib/postgresql/14/bin/createdb -h /tmp -p 54329 -U postgres acharya_mig_test)",
       "Bash(export DATABASE_URL='postgresql+asyncpg://postgres@127.0.0.1:54329/acharya_mig_test' JWT_SECRET=test-secret-string-of-32-characters-min)",
       "Bash(/usr/lib/postgresql/14/bin/psql -h /tmp -p 54329 -U postgres -d acharya_mig_test -c \"DELETE FROM users WHERE name='C';\")",
-      "Bash(/usr/lib/postgresql/14/bin/pg_ctl -D /tmp/claude-1001/-home-sankalp-shankar-Project-Acharya-CLUB/34bdf778-424a-45c0-979b-0b07f1d20619/scratchpad/pgdata stop)"
+      "Bash(/usr/lib/postgresql/14/bin/pg_ctl -D /tmp/claude-1001/-home-sankalp-shankar-Project-Acharya-CLUB/34bdf778-424a-45c0-979b-0b07f1d20619/scratchpad/pgdata stop)",
+      "Bash(node -e \"const p=require\\('./node_modules/rolldown/package.json'\\); console.log\\(JSON.stringify\\(p.optionalDependencies,null,2\\)\\)\")"
     ]
   }
 }

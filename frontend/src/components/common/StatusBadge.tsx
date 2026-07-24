@@ -27,6 +27,7 @@ function resolveTone(kind: StatusKind, status: string, eventType?: EventType): T
     case 'late':
       return 'amber';
     case 'rejected':
+    case 'absent':
       return 'red';
     default:
       return 'grey';

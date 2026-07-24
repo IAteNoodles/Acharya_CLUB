@@ -57,11 +57,13 @@ export function EventForm({
   defaultValues,
   submitLabel,
   requireFutureStart = true,
+  lockCategory,
   onSubmit,
 }: {
   defaultValues?: Partial<EventFormValues>;
   submitLabel: string;
   requireFutureStart?: boolean;
+  lockCategory?: EventFormValues['category'];
   onSubmit: (values: EventFormValues) => Promise<void>;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export function EventForm({
     formState: { errors, isSubmitting },
   } = useForm<EventFormValues>({
     resolver: zodResolver(buildSchema(requireFutureStart)),
-    defaultValues: { category: 'both', ...defaultValues },
+    defaultValues: { category: lockCategory ?? 'both', ...defaultValues },
   });
 
   const category = watch('category');
@@ -147,27 +149,39 @@ export function EventForm({
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="event-category">Who can join</Label>
-        <Select
-          value={category}
-          onValueChange={(value) => setValue('category', value as EventFormValues['category'])}
-        >
-          <SelectTrigger id="event-category" aria-invalid={!!errors.category}>
-            <SelectValue placeholder="Pick who can join" />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.keys(CATEGORY_LABELS) as EventFormValues['category'][]).map((value) => (
-              <SelectItem key={value} value={value}>
-                {CATEGORY_LABELS[value]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.category && (
-          <p className="text-sm text-status-rejected">{errors.category.message}</p>
-        )}
-      </div>
+      {lockCategory ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="event-category">Who can join</Label>
+          <p
+            id="event-category"
+            className="rounded-md border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground"
+          >
+            {CATEGORY_LABELS[lockCategory]}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <Label htmlFor="event-category">Who can join</Label>
+          <Select
+            value={category}
+            onValueChange={(value) => setValue('category', value as EventFormValues['category'])}
+          >
+            <SelectTrigger id="event-category" aria-invalid={!!errors.category}>
+              <SelectValue placeholder="Pick who can join" />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(CATEGORY_LABELS) as EventFormValues['category'][]).map((value) => (
+                <SelectItem key={value} value={value}>
+                  {CATEGORY_LABELS[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.category && (
+            <p className="text-sm text-status-rejected">{errors.category.message}</p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">

@@ -22,7 +22,18 @@ export function isApiError(value: unknown): value is ApiError {
 interface FastApiDetailItem {
   loc: (string | number)[];
   msg: string;
-  type: string;
+  type?: string;
+}
+
+function fieldErrorsFromDetail(detail: unknown): Record<string, string> | undefined {
+  if (!Array.isArray(detail)) return undefined;
+  const fieldErrors: Record<string, string> = {};
+  for (const item of detail as FastApiDetailItem[]) {
+    if (!item || !Array.isArray(item.loc) || typeof item.msg !== 'string') continue;
+    const field = item.loc.filter((part) => part !== 'body').join('.') || 'form';
+    fieldErrors[field] = item.msg;
+  }
+  return Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined;
 }
 
 export function toApiError(error: unknown): ApiError {
@@ -48,19 +59,20 @@ export function toApiError(error: unknown): ApiError {
 
   if (data && typeof data === 'object') {
     if ('error' in data && data.error && typeof data.error === 'object') {
-      const err = data.error as { code?: string; message?: string };
+      const err = data.error as { code?: string; message?: string; details?: unknown };
       if (err.code) result.code = err.code;
       if (err.message) result.message = err.message;
+      const fieldErrors = fieldErrorsFromDetail(err.details);
+      if (fieldErrors) {
+        result.fieldErrors = fieldErrors;
+        result.message = Object.values(fieldErrors)[0] ?? result.message;
+      }
       return result;
     }
     if ('detail' in data) {
       result.code = 'VALIDATION_ERROR';
-      if (Array.isArray(data.detail)) {
-        const fieldErrors: Record<string, string> = {};
-        for (const item of data.detail as FastApiDetailItem[]) {
-          const field = item.loc?.filter((part) => part !== 'body').join('.') || 'form';
-          fieldErrors[field] = item.msg;
-        }
+      const fieldErrors = fieldErrorsFromDetail(data.detail);
+      if (fieldErrors) {
         result.fieldErrors = fieldErrors;
         result.message = Object.values(fieldErrors)[0] ?? 'Check the highlighted fields.';
       } else if (typeof data.detail === 'string') {

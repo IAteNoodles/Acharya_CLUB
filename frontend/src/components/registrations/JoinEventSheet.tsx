@@ -20,21 +20,14 @@ const ROLE_COPY: Record<RegistrationRole, { title: string; blurb: string }> = {
   volunteer: { title: 'Volunteer', blurb: 'Help organize and run the event.' },
 };
 
-export function JoinEventSheet({
-  event,
-  takenRoles,
-}: {
-  event: Event;
-  takenRoles: RegistrationRole[];
-}) {
+export function JoinEventSheet({ event }: { event: Event }) {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<RegistrationRole | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const registerMutation = useRegister(event.id);
 
-  const offeredRoles: RegistrationRole[] =
+  const availableRoles: RegistrationRole[] =
     event.category === 'both' ? ['participant', 'volunteer'] : [event.category];
-  const availableRoles = offeredRoles.filter((r) => !takenRoles.includes(r));
 
   const confirm = async () => {
     if (!role) return;

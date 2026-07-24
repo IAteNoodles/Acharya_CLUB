@@ -17,6 +17,7 @@ export function useEventsList(params: EventListParams = {}) {
   return useQuery({
     queryKey: ['events', 'list', params],
     queryFn: () => listEvents(params),
+    refetchOnMount: 'always',
   });
 }
 

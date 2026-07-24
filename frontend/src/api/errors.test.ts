@@ -34,7 +34,40 @@ describe('toApiError', () => {
     expect(result.message).toBe('Invalid email or password');
   });
 
-  it('maps FastAPI default 422 detail arrays into fieldErrors', () => {
+  it('maps enveloped 422 error.details into fieldErrors', () => {
+    const result = toApiError(
+      axiosError(422, {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed',
+          details: [
+            { loc: ['body', 'email'], msg: 'Must use a @college.edu email address', type: 'value_error' },
+          ],
+        },
+      }),
+    );
+    expect(result.code).toBe('VALIDATION_ERROR');
+    expect(result.fieldErrors).toEqual({ email: 'Must use a @college.edu email address' });
+    expect(result.message).toBe('Must use a @college.edu email address');
+  });
+
+  it('maps enveloped details without a type field (ValidationException)', () => {
+    const result = toApiError(
+      axiosError(422, {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed',
+          details: [{ loc: ['category'], msg: "must be 'participant' for out_college events" }],
+        },
+      }),
+    );
+    expect(result.fieldErrors).toEqual({ category: "must be 'participant' for out_college events" });
+    expect(result.message).toBe("must be 'participant' for out_college events");
+  });
+
+  it('still maps legacy FastAPI raw 422 detail arrays into fieldErrors', () => {
     const result = toApiError(
       axiosError(422, {
         detail: [

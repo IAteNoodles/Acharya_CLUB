@@ -4,13 +4,16 @@ import {
   CalendarDays,
   ClipboardCheck,
   HeartHandshake,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Ticket,
   UserRound,
   UsersRound,
 } from 'lucide-react';
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,6 +59,7 @@ export function PortalLayout({ role }: { role: Role }) {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const items = NAV[role];
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -64,6 +68,7 @@ export function PortalLayout({ role }: { role: Role }) {
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[220px_1fr]">
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-ink focus:px-3 focus:py-2 focus:text-sm focus:text-paper"
@@ -149,6 +154,10 @@ export function PortalLayout({ role }: { role: Role }) {
                 <DropdownMenuItem onSelect={() => navigate(`/${role}/notifications`)}>
                   <Bell aria-hidden="true" className="mr-2 h-4 w-4" />
                   Notifications
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
+                  <KeyRound aria-hidden="true" className="mr-2 h-4 w-4" />
+                  Change password
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={handleLogout}>
                   <LogOut aria-hidden="true" className="mr-2 h-4 w-4" />

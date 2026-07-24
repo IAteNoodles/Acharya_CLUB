@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as authApi from '@/api/auth.api';
 import { refreshSession } from '@/api/client';
+import { queryClient } from '@/api/queryClient';
 import { tokens } from '@/api/tokens';
 import type { User } from '@/types/domain';
 
@@ -41,6 +42,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async login(email, password) {
     const { user, accessToken, refreshToken } = await authApi.login(email, password);
+    queryClient.clear();
     tokens.setAccess(accessToken);
     tokens.setRefresh(refreshToken);
     set({ user, status: 'authed', sessionExpired: false });
@@ -72,6 +74,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearSession(expired = false) {
     tokens.clear();
+    queryClient.clear();
     set({ user: null, accessToken: null, status: 'guest', sessionExpired: expired });
   },
 }));
@@ -81,5 +84,6 @@ tokens.registerAccessTokenListener((token) => {
 });
 
 tokens.registerSessionExpiredHandler(() => {
+  queryClient.clear();
   useAuthStore.setState({ user: null, accessToken: null, status: 'guest', sessionExpired: true });
 });

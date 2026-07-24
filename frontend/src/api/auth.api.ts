@@ -27,3 +27,8 @@ export const logout = (refreshToken: string) =>
 
 export const me = () =>
   client.get('/auth/me').then((r) => unwrapData<{ user: User }>(r.data).user);
+
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  client
+    .post('/auth/change-password', { currentPassword, newPassword })
+    .then((r) => unwrapData<{ message: string }>(r.data));
