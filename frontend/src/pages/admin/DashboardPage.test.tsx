@@ -11,7 +11,7 @@ function card(label: RegExp) {
   const container = heading.closest('div')?.parentElement as HTMLElement;
   return {
     value: container.querySelector('p.text-2xl'),
-    hint: container.querySelector('p.mt-1'),
+    breakdown: container.querySelector('p.mt-1\\.5'),
   };
 }
 
@@ -27,47 +27,80 @@ const SEEDED = {
       admin: { active: 1 },
     },
   },
-  events: { total: 4, by_status: {}, by_type: {} },
+  events: { total: 4, by_status: { approved: 3, pending: 1 }, by_type: {} },
   registrations: { total: 2, by_status: { pending: 2 } },
   attendance: { total: 0, by_status: {} },
   notifications: { total: 4, unread: 2 },
 };
 
-function serveStats(users: unknown) {
+function serveStats(stats: Record<string, unknown>) {
   server.use(
     http.get(`${BASE}/reports/dashboard`, () =>
-      HttpResponse.json({ success: true, data: { ...SEEDED, users } }),
+      HttpResponse.json({ success: true, data: { ...SEEDED, ...stats } }),
     ),
   );
 }
 
 describe('DashboardPage', () => {
-  it('counts pending teachers without counting pending students', async () => {
-    serveStats(SEEDED.users);
+  it('counts teachers awaiting approval without counting pending students', async () => {
+    serveStats({});
     renderWithProviders(<DashboardPage />, { route: '/admin', path: '/admin' });
 
-    await waitFor(() => expect(card(/teacher accounts/i).value).toHaveTextContent('1'));
-    expect(card(/^registrations$/i).value).toHaveTextContent('2');
+    await waitFor(() => expect(card(/teachers to approve/i).value).toHaveTextContent('1'));
+    expect(card(/events to review/i).value).toHaveTextContent('1');
+    expect(card(/registrations to review/i).value).toHaveTextContent('2');
   });
 
-  it('qualifies the student and teacher counts with their own active totals', async () => {
-    serveStats(SEEDED.users);
+  it('breaks every account total down by status so the headline number is explained', async () => {
+    serveStats({});
     renderWithProviders(<DashboardPage />, { route: '/admin', path: '/admin' });
 
-    await waitFor(() => expect(card(/^students$/i).value).toHaveTextContent('4'));
-    expect(card(/^students$/i).hint).toHaveTextContent('3 active');
-    expect(card(/^teachers$/i).value).toHaveTextContent('3');
-    expect(card(/^teachers$/i).hint).toHaveTextContent('1 active');
+    await waitFor(() => expect(card(/^teacher accounts$/i).value).toHaveTextContent('3'));
+    expect(card(/^teacher accounts$/i).breakdown).toHaveTextContent(
+      '1 active · 1 pending · 1 rejected',
+    );
+    expect(card(/^student accounts$/i).value).toHaveTextContent('4');
+    expect(card(/^student accounts$/i).breakdown).toHaveTextContent('3 active · 1 pending');
   });
 
-  it('renders a zero rather than an em dash when a role has no pending accounts', async () => {
+  it('orders the breakdown by lifecycle, not by the order the API returned', async () => {
     serveStats({
-      ...SEEDED.users,
-      by_role_status: { ...SEEDED.users.by_role_status, teacher: { active: 3 } },
+      users: {
+        ...SEEDED.users,
+        by_role_status: { teacher: { rejected: 1, pending: 2, active: 4 } },
+      },
     });
     renderWithProviders(<DashboardPage />, { route: '/admin', path: '/admin' });
 
-    await waitFor(() => expect(card(/^teachers$/i).hint).toHaveTextContent('3 active'));
-    expect(card(/teacher accounts/i).value).toHaveTextContent('0');
+    await waitFor(() =>
+      expect(card(/^teacher accounts$/i).breakdown).toHaveTextContent(
+        '4 active · 2 pending · 1 rejected',
+      ),
+    );
+  });
+
+  it('replaces the queues with an all-clear when nothing is pending', async () => {
+    serveStats({
+      users: { ...SEEDED.users, by_role_status: { teacher: { active: 1 } } },
+      events: { total: 4, by_status: { approved: 4 }, by_type: {} },
+      registrations: { total: 2, by_status: { accepted: 2 } },
+    });
+    renderWithProviders(<DashboardPage />, { route: '/admin', path: '/admin' });
+
+    expect(await screen.findByText(/nothing needs a decision/i)).toBeInTheDocument();
+    expect(screen.queryByText(/teachers to approve/i)).not.toBeInTheDocument();
+  });
+
+  it('shows an em dash rather than a zero before the stats arrive', async () => {
+    server.use(
+      http.get(`${BASE}/reports/dashboard`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return HttpResponse.json({ success: true, data: SEEDED });
+      }),
+    );
+    renderWithProviders(<DashboardPage />, { route: '/admin', path: '/admin' });
+
+    expect(card(/teachers to approve/i).value).toHaveTextContent('—');
+    await waitFor(() => expect(card(/teachers to approve/i).value).toHaveTextContent('1'));
   });
 });

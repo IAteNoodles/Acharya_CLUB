@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
 import type { EventType } from '@/types/enums';
 
-type StatusKind = 'event' | 'registration' | 'attendance' | 'user' | 'event-type';
+export type StatusKind = 'event' | 'registration' | 'attendance' | 'user' | 'event-type';
 
-type Tone = 'blue' | 'teal' | 'amber' | 'red' | 'green' | 'grey';
+export type Tone = 'blue' | 'teal' | 'amber' | 'red' | 'green' | 'grey';
 
 const TONE_CLASSES: Record<Tone, string> = {
   blue: 'text-status-approved-in border-status-approved-in/60 bg-status-approved-in/[0.08]',
@@ -14,7 +14,7 @@ const TONE_CLASSES: Record<Tone, string> = {
   grey: 'text-status-draft border-status-draft/60 bg-status-draft/[0.08]',
 };
 
-function resolveTone(kind: StatusKind, status: string, eventType?: EventType): Tone {
+export function resolveTone(kind: StatusKind, status: string, eventType?: EventType): Tone {
   if (kind === 'event-type') return status === 'in_college' ? 'blue' : 'teal';
   switch (status) {
     case 'approved':
