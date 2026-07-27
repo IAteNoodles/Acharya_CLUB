@@ -192,7 +192,6 @@ async def seed(if_empty: bool = False):
         # ── Registrations ──────────────────────────────────
         regs = [
             Registration(event_id=event1.id, student_id=student1.id, role_type=RegistrationRole.PARTICIPANT, status=RegistrationStatus.ACCEPTED),
-            Registration(event_id=event1.id, student_id=student1.id, role_type=RegistrationRole.VOLUNTEER, status=RegistrationStatus.ACCEPTED),
             Registration(event_id=event1.id, student_id=student2.id, role_type=RegistrationRole.PARTICIPANT, status=RegistrationStatus.PENDING),
             Registration(event_id=event2.id, student_id=student3.id, role_type=RegistrationRole.PARTICIPANT, status=RegistrationStatus.ACCEPTED),
             Registration(event_id=event3.id, student_id=student1.id, role_type=RegistrationRole.PARTICIPANT, status=RegistrationStatus.PENDING),
@@ -202,7 +201,7 @@ async def seed(if_empty: bool = False):
         for r in regs:
             session.add(r)
         await session.flush()
-        print("  Registrations created: 7 entries")
+        print("  Registrations created: 6 entries")
 
         # ── Attendance ─────────────────────────────────────
         att1 = Attendance(

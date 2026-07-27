@@ -116,7 +116,16 @@ export const handlers = [
     HttpResponse.json({
       success: true,
       data: {
-        users: { total: 5, by_role: { student: 3, teacher: 1, admin: 1 }, by_status: { active: 4, pending: 1 } },
+        users: {
+          total: 5,
+          by_role: { student: 3, teacher: 1, admin: 1 },
+          by_status: { active: 4, pending: 1 },
+          by_role_status: {
+            student: { active: 2, pending: 1 },
+            teacher: { active: 1 },
+            admin: { active: 1 },
+          },
+        },
         events: { total: 2, by_status: { approved: 1, pending: 1 }, by_type: { in_college: 1, out_college: 1 } },
         registrations: { total: 4, by_status: { pending: 2, accepted: 2 } },
         attendance: { total: 6, by_status: { present: 5, absent: 1 } },

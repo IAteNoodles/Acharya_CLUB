@@ -637,6 +637,11 @@ Attendance**
   (`users.by_role.student` with by_status active where derivable — show role totals and a
   secondary status line), Pending Approvals (events pending + teachers pending +
   registrations pending as three small cards), Teachers count, notifications unread.
+  Any card that names a role **and** a status reads `users.by_role_status[role][status]`
+  (teachers pending, students active, teachers active). `by_role` and `by_status` are
+  single-axis totals — `by_status.pending` spans every role and will include pending
+  students, so it must not be used for a teacher-specific card. Roles with no users in a
+  given status are absent from the cross-tab, so read them as `?.[status] ?? 0`.
 - Color-coded month calendar (PDF §5.5): events plotted on their date ranges — blue
   in_college, teal out_college, amber pending. Data: `/events?limit=100` (admin sees
   all); client-side placement. (Good enough for a single college's volume; paginate/lazy

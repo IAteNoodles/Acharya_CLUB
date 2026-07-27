@@ -11,6 +11,9 @@ export function DashboardPage() {
   const { data: stats } = useDashboard();
   const { data: allEvents, isPending: eventsPending } = useEventsList({ limit: 100 });
 
+  const roleStatus = (role: string, status: string) =>
+    stats ? (stats.users.by_role_status[role]?.[status] ?? 0) : '—';
+
   return (
     <div>
       <PageHeader title="Dashboard" description="Platform activity across the college." />
@@ -21,9 +24,14 @@ export function DashboardPage() {
           label="Students"
           value={stats?.users.by_role.student ?? '—'}
           icon={GraduationCap}
-          hint={`${stats?.users.by_status.active ?? '—'} active users overall`}
+          hint={`${roleStatus('student', 'active')} active`}
         />
-        <StatCard label="Teachers" value={stats?.users.by_role.teacher ?? '—'} icon={UsersRound} />
+        <StatCard
+          label="Teachers"
+          value={stats?.users.by_role.teacher ?? '—'}
+          icon={UsersRound}
+          hint={`${roleStatus('teacher', 'active')} active`}
+        />
         <StatCard
           label="Unread notifications"
           value={stats?.notifications.unread ?? '—'}
@@ -48,7 +56,7 @@ export function DashboardPage() {
           <Link to="/admin/panel" className="rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             <StatCard
               label="Teacher accounts"
-              value={stats?.users.by_status.pending ?? '—'}
+              value={roleStatus('teacher', 'pending')}
               hint="Review in the Admin Panel"
               className="h-full transition-colors hover:border-ink/40"
             />

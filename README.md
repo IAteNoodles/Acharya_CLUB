@@ -258,7 +258,7 @@ All endpoints prefixed with `/api/v1`. Bearer JWT required except `health`, `aut
 ### Reports
 | Method | Path | Role | Description |
 |--------|------|------|-------------|
-| GET | `/reports/dashboard` | Teacher/Admin | Dashboard (8 concurrent queries) |
+| GET | `/reports/dashboard` | Teacher/Admin | Dashboard (7 aggregate queries) |
 
 ---
 

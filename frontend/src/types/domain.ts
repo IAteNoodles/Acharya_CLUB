@@ -97,7 +97,12 @@ export interface AppNotification {
 }
 
 export interface DashboardStats {
-  users: { total: number; by_role: Record<string, number>; by_status: Record<string, number> };
+  users: {
+    total: number;
+    by_role: Record<string, number>;
+    by_status: Record<string, number>;
+    by_role_status: Record<string, Record<string, number>>;
+  };
   events: { total: number; by_status: Record<string, number>; by_type: Record<string, number> };
   registrations: { total: number; by_status: Record<string, number> };
   attendance: { total: number; by_status: Record<string, number> };
