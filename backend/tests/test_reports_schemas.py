@@ -6,15 +6,27 @@ class TestUserStats:
     def test_valid(self):
         from app.schemas.reports import UserStats
 
-        data = UserStats(total=100, by_role={"student": 80, "teacher": 20}, by_status={"active": 90, "pending": 10})
+        data = UserStats(
+            total=100,
+            by_role={"student": 80, "teacher": 20},
+            by_status={"active": 90, "pending": 10},
+            by_role_status={"student": {"active": 76, "pending": 4}, "teacher": {"active": 14, "pending": 6}},
+        )
         assert data.total == 100
         assert data.by_role["student"] == 80
+        assert data.by_role_status["teacher"]["pending"] == 6
 
     def test_rejects_missing_fields(self):
         from app.schemas.reports import UserStats
 
         with pytest.raises(ValidationError):
             UserStats()
+
+    def test_rejects_missing_by_role_status(self):
+        from app.schemas.reports import UserStats
+
+        with pytest.raises(ValidationError):
+            UserStats(total=100, by_role={}, by_status={})
 
 
 class TestEventStats:
@@ -55,7 +67,7 @@ class TestDashboardResponse:
         from app.schemas.reports import DashboardResponse, UserStats, EventStats, RegistrationStats, AttendanceStats, NotificationStats
 
         data = DashboardResponse(
-            users=UserStats(total=100, by_role={}, by_status={}),
+            users=UserStats(total=100, by_role={}, by_status={}, by_role_status={}),
             events=EventStats(total=50, by_status={}, by_type={}),
             registrations=RegistrationStats(total=200, by_status={}),
             attendance=AttendanceStats(total=500, by_status={}),
@@ -72,7 +84,7 @@ class TestDashboardResponse:
 
         with pytest.raises(ValidationError):
             DashboardResponse(
-                users=UserStats(total=100, by_role={}, by_status={}),
+                users=UserStats(total=100, by_role={}, by_status={}, by_role_status={}),
                 events=EventStats(total=50, by_status={}, by_type={}),
                 registrations=RegistrationStats(total=200, by_status={}),
                 attendance=AttendanceStats(total=500, by_status={}),

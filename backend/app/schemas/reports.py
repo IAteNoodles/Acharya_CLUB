@@ -5,6 +5,7 @@ class UserStats(BaseModel):
     total: int
     by_role: dict
     by_status: dict
+    by_role_status: dict
 
 
 class EventStats(BaseModel):

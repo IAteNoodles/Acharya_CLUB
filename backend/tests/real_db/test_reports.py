@@ -90,6 +90,45 @@ class TestReportsRealDB:
         assert result.notifications.total >= 1
         assert result.notifications.unread >= 1
 
+    async def test_by_role_status_separates_roles_sharing_a_status(self, db_session):
+        from app.services.reports import ReportService
+
+        db_session.add(
+            User(
+                name="Pending Teacher",
+                email=f"pending.teacher.{uuid.uuid4()}@college.edu",
+                password_hash="hash",
+                role=Role.TEACHER,
+                status=UserStatus.PENDING,
+            )
+        )
+        db_session.add(
+            User(
+                name="Pending Student",
+                email=f"pending.student.{uuid.uuid4()}@college.edu",
+                password_hash="hash",
+                role=Role.STUDENT,
+                status=UserStatus.PENDING,
+            )
+        )
+        db_session.add(
+            User(
+                name="Rejected Teacher",
+                email=f"rejected.teacher.{uuid.uuid4()}@college.edu",
+                password_hash="hash",
+                role=Role.TEACHER,
+                status=UserStatus.REJECTED,
+            )
+        )
+        await db_session.flush()
+
+        result = await ReportService.get_dashboard_stats(db_session)
+
+        assert result.users.by_status.get("pending") == 2
+        assert result.users.by_role_status["teacher"]["pending"] == 1
+        assert result.users.by_role_status["student"]["pending"] == 1
+        assert result.users.by_role_status["teacher"]["rejected"] == 1
+
     async def test_get_dashboard_stats_empty_db(self, db_session):
         from app.services.reports import ReportService
 
@@ -97,6 +136,7 @@ class TestReportsRealDB:
 
         assert result.users.total == 0
         assert result.users.by_role == {}
+        assert result.users.by_role_status == {}
         assert result.events.total == 0
         assert result.registrations.total == 0
         assert result.attendance.total == 0
